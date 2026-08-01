@@ -70,8 +70,9 @@ npm run test:e2e  # браузерные тесты (нужен npx playwright i
 ## Публикация
 
 GitHub Pages разворачивается из `web/` при пуше в `main`
-(`.github/workflows/deploy.yml`). Один раз нужно включить в настройках
-репозитория **Settings → Pages → Source: GitHub Actions**.
+(`.github/workflows/deploy.yml`). Workflow включает Pages сам
+(`configure-pages` с `enablement: true`); если этот шаг падает по правам,
+включите вручную: **Settings → Pages → Source: GitHub Actions**.
 
 Маршрутизация по хэшу (`#/drill`), поэтому приложение работает из любого
 подкаталога и не требует SPA-фолбэка.

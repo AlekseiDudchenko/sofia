@@ -30,7 +30,11 @@ jobs:
       - run: npm ci
       # web/js/ в репозитории нет — публикуется результат сборки.
       - run: npm run build
+      # enablement включает Pages через API, если в настройках репозитория это
+      # ещё не сделано: иначе первый деплой падает на «Get Pages site failed».
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: web

@@ -19,7 +19,7 @@ function route(path: string): void {
         document.title = "Спринт";
         cleanup = showSprint();
     } else {
-        document.title = "Таблица умножения";
+        document.title = "Таблица умножения миньонов для Сони из Томска";
         cleanup = showHome();
     }
 }

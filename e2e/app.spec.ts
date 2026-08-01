@@ -60,6 +60,9 @@ test("незавершённое двузначное число ответом 
 
 test("тренировка доходит до итогов, а прогресс переживает переход на главную", async ({ page }) => {
     await page.click('[data-act="drill"]');
+    // count() не ждёт появления элемента, поэтому без этой строки цикл может
+    // не начаться: на быстром раннере проверка обгоняет отрисовку экрана.
+    await page.waitForSelector("#question");
 
     for (let i = 0; i < 30 && (await page.locator("#question").count()) > 0; i++) {
         await type(page, await currentProduct(page));

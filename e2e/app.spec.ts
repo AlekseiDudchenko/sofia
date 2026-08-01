@@ -77,6 +77,28 @@ test("тренировка доходит до итогов, а прогресс
     await expect(page.locator(".cell.b-low, .cell.b-mid")).not.toHaveCount(0);
 });
 
+/* Экран тренировки обязан помещаться целиком: нижний ряд клавиатуры за краем
+ * экрана — это невозможность ответить, а не косметика. */
+for (const viewport of [
+    { name: "низкий экран", width: 320, height: 568 },
+    { name: "альбомная ориентация", width: 740, height: 360 },
+]) {
+    test(`клавиатура помещается на экране: ${viewport.name}`, async ({ page }) => {
+        await page.setViewportSize({ width: viewport.width, height: viewport.height });
+        await page.click('[data-act="drill"]');
+        await page.waitForSelector("#question");
+
+        const box = (await page.locator(".keypad").boundingBox())!;
+        expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+        expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+        // Прокрутки на экране тренировки быть не должно вовсе.
+        const overflow = await page.evaluate(
+            () => document.documentElement.scrollHeight - window.innerHeight,
+        );
+        expect(overflow).toBeLessThanOrEqual(0);
+    });
+}
+
 test("спринт считает очки и идёт по таймеру", async ({ page }) => {
     await page.click('[data-act="sprint"]');
     await expect(page.locator("#timer")).toBeVisible();

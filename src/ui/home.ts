@@ -34,7 +34,7 @@ export function showHome(): () => void {
 
     const scope = render(`
         <div class="top">
-            <h1>Таблица умножения</h1>
+            <h1 class="long">Таблица умножения миньонов для Сони из Томска</h1>
             <span class="streak${streak ? "" : " cold"}">
                 ${streak ? "🔥" : "·"} ${streak} ${plural(streak, "день", "дня", "дней")}
             </span>

@@ -118,6 +118,21 @@ button {
 
 .icon-btn:active { background: var(--surface-2); }
 
+/* Звук в панели тренировки — второстепенная кнопка рядом с крестиком выхода:
+   меньше, без подложки, чтобы не спорить с ним за внимание. */
+.icon-btn.quiet {
+    width: 36px;
+    height: 36px;
+    font-size: 1rem;
+    background: none;
+    opacity: 0.75;
+}
+
+.icon-btn.quiet:active { background: var(--surface); opacity: 1; }
+
+/* Выключенный звук виден и без подписи — приглушаем иконку сильнее. */
+.icon-btn.quiet[aria-pressed="false"] { opacity: 0.45; }
+
 /* ── Дневная норма ─────────────────────────────────────────────────────── */
 
 .daily {
@@ -437,6 +452,11 @@ button {
     font-size: 0.83rem;
 }
 
+.tools button[aria-pressed="false"] { opacity: 0.6; }
+
+/* Эмодзи в подписи не должно тянуть строку вверх. */
+.sound-ic { line-height: 1; }
+
 .note {
     text-align: center;
     font-size: 0.76rem;
@@ -463,6 +483,7 @@ button {
 
     .hint { font-size: 1.25rem; }
     .icon-btn { width: 56px; height: 56px; font-size: 1.5rem; }
+    .icon-btn.quiet { width: 46px; height: 46px; font-size: 1.25rem; }
     .timer, .score { font-size: 1.4rem; }
 }
 

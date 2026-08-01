@@ -1,4 +1,5 @@
 import { startRouter } from "./router.js";
+import { primeSound } from "./sound.js";
 import { showHome } from "./ui/home.js";
 import { showDrill } from "./ui/drill.js";
 import { showSprint } from "./ui/sprint.js";
@@ -23,6 +24,7 @@ function route(path: string): void {
     }
 }
 
+primeSound();
 startRouter(route);
 
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {

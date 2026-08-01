@@ -1,7 +1,7 @@
 /* Service worker: приложение целиком уходит в офлайн после первой загрузки.
  * VERSION подставляется скриптом scripts/stamp-version.mjs из package.json —
  * смена версии катит новый кэш и выбрасывает старый. */
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 const CACHE = `umnozhenie-${VERSION}`;
 
 /* Минимум, чтобы приложение поднялось без сети. Скомпилированные модули

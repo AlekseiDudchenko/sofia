@@ -4,8 +4,24 @@ export function root(): HTMLElement {
     return document.getElementById("app")!;
 }
 
+interface Delegate {
+    scope: HTMLElement;
+    listener: (event: MouseEvent) => void;
+}
+
+/** Делегаты, поставленные экраном, который сейчас на виду. */
+let delegates: Delegate[] = [];
+
 export function render(markup: string): HTMLElement {
     const el = root();
+
+    // Разметка уходит — обработчики предыдущего экрана обязаны уйти с ней.
+    // Контейнер #app один на всё приложение, и без этой уборки делегаты
+    // копятся: одно и то же имя действия на двух экранах (например «sound»
+    // в панели тренировки и в настройках) отрабатывало бы дважды за клик.
+    for (const { scope, listener } of delegates) scope.removeEventListener("click", listener);
+    delegates = [];
+
     el.innerHTML = markup;
     el.scrollTop = 0;
     return el;
@@ -17,13 +33,17 @@ export function qs<T extends HTMLElement>(selector: string, scope: ParentNode = 
     return el;
 }
 
-/** Делегирование по data-act — так разметку можно перерисовывать свободно. */
+/** Делегирование по data-act — так разметку можно перерисовывать свободно.
+ *  Слушатель снимается сам при следующем render(). */
 export function onAction(scope: HTMLElement, handler: (action: string, el: HTMLElement) => void): void {
-    scope.addEventListener("click", (event) => {
+    const listener = (event: MouseEvent) => {
         const target = (event.target as HTMLElement).closest<HTMLElement>("[data-act]");
         if (!target || !scope.contains(target)) return;
         handler(target.dataset.act!, target);
-    });
+    };
+
+    scope.addEventListener("click", listener);
+    delegates.push({ scope, listener });
 }
 
 export function escapeHtml(value: string): string {

@@ -9,6 +9,7 @@ import {
 } from "../store.js";
 import { go } from "../router.js";
 import { render, onAction, plural } from "./dom.js";
+import { SOUND_ACTION, soundToolHTML, toggleSound } from "./sound-toggle.js";
 
 export function showHome(): () => void {
     const today = dayKey(new Date());
@@ -80,6 +81,7 @@ export function showHome(): () => void {
         <div class="spacer"></div>
 
         <div class="tools">
+            ${soundToolHTML()}
             <button data-act="export">Сохранить копию</button>
             <button data-act="import">Загрузить копию</button>
             <button data-act="reset">Начать заново</button>
@@ -96,6 +98,7 @@ export function showHome(): () => void {
         else if (action === "export") downloadBackup(today);
         else if (action === "import") pickBackup();
         else if (action === "reset") confirmReset();
+        else if (action === SOUND_ACTION) toggleSound(el);
         else if (action === "cell") revealCell(el);
     });
 

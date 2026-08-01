@@ -79,6 +79,10 @@ button {
     touch-action: manipulation;
 }
 
+/* Тренировка прячет маскота и кнопку подсказки атрибутом hidden, а у обоих
+   ниже задан свой display — правило автора победило бы правило браузера. */
+[hidden] { display: none !important; }
+
 /* ── Шапка ─────────────────────────────────────────────────────────────── */
 
 .top {
@@ -164,6 +168,8 @@ button {
 .minion-sm { --minion-size: 38px; }
 .minion-md { --minion-size: clamp(58px, 14vw, 78px); }
 .minion-lg { --minion-size: clamp(86px, 20vh, 130px); }
+/* Размер миньона в строю подсказки задаётся не здесь, а самим строем — см.
+   раздел «Строй миньонов». */
 
 /* Ещё не заработанный миньон команды: виден силуэт, но он «не пришёл». */
 .minion.off { filter: grayscale(1); opacity: 0.3; }
@@ -486,6 +492,81 @@ button {
 
 .hint.bad { color: var(--bad); font-weight: 600; }
 
+/* ── Строй миньонов ────────────────────────────────────────────────────── */
+
+/* Строй забирает ровно то место, что осталось в .stage, и делит его между
+   рядами. Считать размер миньона в vh нельзя: свободного места на низком
+   экране втрое меньше, чем на высоком, а рядов бывает от двух до девяти —
+   любая формула от высоты экрана где-нибудь да вылезет за клавиатуру. */
+.array {
+    flex: 1 1 0;
+    min-height: 0;
+    max-width: 100%;
+    /* Два ряда не должны раздуться на пол-экрана только потому, что место
+       есть: выше этого миньон крупнее маскота, а пример уезжает под верхнюю
+       панель. --rows ставит showArray(). */
+    max-height: calc(var(--rows) * 86px);
+    display: flex;
+    flex-direction: column;
+    gap: clamp(3px, 0.7vh, 6px);
+    align-items: center;
+}
+
+/* Пустой строй занимал бы всю середину экрана и на каждом примере без
+   подсказки уводил бы клавиатуру вниз. */
+.array:empty { display: none; }
+
+/* Подложка ряда — то, что делает картинку счётной: восемь миньонов вразброс
+   пересчитываются хуже, чем два ряда по четыре с явными границами. */
+.arow {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    gap: clamp(3px, 0.9vw, 5px);
+    padding: clamp(2px, 0.6vh, 5px) clamp(4px, 1.6vw, 8px);
+    border-radius: 12px;
+    background: rgba(124, 108, 255, 0.12);
+    box-shadow: inset 0 0 0 1px rgba(124, 108, 255, 0.18);
+}
+
+/* Миньон в строю тянется за высотой ряда, а не за --minion-size: правило
+   идёт после «.stage .minion», иначе маскотный размер победил бы по
+   специфичности. Если ряд длинный, миньоны ужимаются по ширине — svg с
+   viewBox вписывается в бокс сам и пропорций не теряет. */
+.array .minion { flex: 0 1 auto; width: auto; min-width: 0; height: 100%; }
+.array .minion svg { width: 100%; height: 100%; }
+
+/* Пока строй на экране, пример и поле ответа ужимаются. Место на телефоне
+   одно: пять рядов по пять миньонов нужнее крупных цифр — их и так видно. */
+.stage.with-array .question { font-size: clamp(1.5rem, min(9vw, 6vh), 2.4rem); }
+.stage.with-array .slot { height: clamp(46px, 7.5vh, 62px); font-size: clamp(1.5rem, 5vh, 2rem); }
+.stage.with-array .hint { min-height: 0.6em; }
+
+/* Кнопка подсказки тише клавиш: за ней помощь, а не ответ, и тянуться к ней
+   первым делом не надо. */
+.hint-btn {
+    align-self: center;
+    padding: 8px 18px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.hint-btn:active { background: var(--surface-2); color: var(--text); }
+
+/* Кнопка встала в столбик к примеру, и на низком экране нижний ряд клавиш
+   перестал помещаться. Ужимаем то, что можно ужать, — маскота и промежутки:
+   возможность ответить важнее размера миньона. */
+@media (max-height: 660px) {
+    .stage { gap: clamp(6px, 1.4vh, 12px); }
+    .stage > .minion { --minion-size: clamp(34px, 6.4vh, 56px); }
+    .hint-btn { padding: 6px 14px; font-size: 0.85rem; }
+}
+
 /* ── Клавиатура ────────────────────────────────────────────────────────── */
 
 .keypad {
@@ -649,9 +730,12 @@ button {
         gap: 8px;
     }
 
-    /* Миньону в колонке с примером места нет: он отнимает высоту у ответа. */
-    .stage .minion { display: none; }
+    /* Миньону в колонке с примером места нет: он отнимает высоту у ответа.
+       Строй подсказки при этом остаётся — он не украшение, а помощь, и в
+       свободную высоту колонки вписывается сам. */
+    .stage > .minion { display: none; }
     .result .minion { --minion-size: clamp(70px, 26vh, 96px); }
+    .array { max-height: calc(var(--rows) * 48px); }
 
     .key { height: auto; font-size: clamp(1.1rem, 5.5vh, 1.7rem); }
     .question { font-size: clamp(1.9rem, 11vh, 3rem); }

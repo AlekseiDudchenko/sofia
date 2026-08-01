@@ -21,8 +21,9 @@ export type MinionEyes = 1 | 2;
 export interface MinionOptions {
     mood?: MinionMood;
     eyes?: MinionEyes;
-    /** Размер: sm — в ряду команды, md — на главной, lg — на итогах. */
-    size?: "sm" | "md" | "lg";
+    /** Размер: sm — в ряду команды, md — на главной, lg — на итогах,
+     *  row — в строю подсказки, где размер считается от размера строя. */
+    size?: "sm" | "md" | "lg" | "row";
     /** Класс сверху — например, чтобы притушить незаработанного миньона. */
     extra?: string;
 }

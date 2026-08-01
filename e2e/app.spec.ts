@@ -260,3 +260,94 @@ test("спринт считает очки и идёт по таймеру", asy
     await type(page, await currentProduct(page));
     await expect(page.locator("#score")).toHaveText("1");
 });
+
+/* Подсказка миньонами: пример 2 × 4 раскладывается в два ряда по четыре.
+ * Строй рисуется не всегда — только пока пример считают, а не вспоминают, —
+ * поэтому сначала ищем пример, у которого кнопка вообще есть. */
+test.describe("подсказка миньонами", () => {
+    /** Прокликивает примеры, пока не попадётся тот, у которого есть подсказка. */
+    async function untilHinted(page: Page): Promise<{ left: number; right: number }> {
+        await page.waitForSelector("#question");
+        for (let i = 0; i < 12; i++) {
+            const [left, right] = (await page.locator("#question").textContent())!
+                .split("×").map((part) => Number(part.trim()));
+            if (await page.locator('[data-act="hint"]').isVisible()) {
+                return { left: left!, right: right! };
+            }
+            await type(page, left! * right!);
+            await page.waitForTimeout(550);
+        }
+        throw new Error("пример с подсказкой так и не встретился");
+    }
+
+    test("раскладывает пример рядами и уступает место маскоту обратно", async ({ page }) => {
+        await page.click('[data-act="drill"]');
+        const { left, right } = await untilHinted(page);
+
+        await expect(page.locator(".arow")).toHaveCount(0);
+        await page.click('[data-act="hint"]');
+
+        await expect(page.locator(".arow")).toHaveCount(left);
+        await expect(page.locator(".arow").first().locator(".minion")).toHaveCount(right);
+        await expect(page.locator("#array .minion")).toHaveCount(left * right);
+        // Маскот уходит: вдвоём со строем им тесно.
+        await expect(page.locator(".stage > .minion")).toBeHidden();
+        await expect(page.locator('[data-act="hint"]')).toBeHidden();
+
+        // Следующий пример начинается с чистого экрана — подсказку просят заново.
+        await type(page, left * right);
+        await page.waitForTimeout(650);
+        await expect(page.locator(".arow")).toHaveCount(0);
+        await expect(page.locator(".stage > .minion")).toBeVisible();
+    });
+
+    test("ответ со строем на экране не поднимает ступень факта", async ({ page }) => {
+        await page.click('[data-act="drill"]');
+        const { left, right } = await untilHinted(page);
+        const id = left <= right ? `${left}x${right}` : `${right}x${left}`;
+
+        await page.click('[data-act="hint"]');
+        await type(page, left * right);
+        await expect(page.locator(".slot")).toHaveClass(/correct/);
+
+        // Ступень растёт только от быстрого ответа без подсказки: пересчитать
+        // миньонов — не то же самое, что вспомнить.
+        const box = await page.evaluate((cardId) => {
+            const cards = JSON.parse(localStorage.getItem("sofia.cards.v1") ?? "[]");
+            return cards.find((c: { id: string }) => c.id === cardId)?.box;
+        }, id);
+        expect(box).toBe(0);
+    });
+});
+
+/* Строй занимает место маскота, а не место клавиатуры: на низком экране это
+ * разница между «можно ответить» и «кнопки за краем». */
+for (const viewport of [
+    { name: "низкий экран", width: 320, height: 568 },
+    { name: "альбомная ориентация", width: 740, height: 360 },
+]) {
+    test(`строй подсказки не выдавливает клавиатуру: ${viewport.name}`, async ({ page }) => {
+        await page.setViewportSize({ width: viewport.width, height: viewport.height });
+        await page.click('[data-act="drill"]');
+        await page.waitForSelector("#question");
+
+        // Самый высокий строй из возможных — пять рядов по пять.
+        await page.evaluate(async () => {
+            const { arrayHTML } = await import("/js/ui/array.js");
+            const array = document.querySelector("#array")!;
+            array.innerHTML = arrayHTML(5, 5);
+            (array as HTMLElement).style.setProperty("--rows", "5");
+            document.querySelector(".stage")!.classList.add("with-array");
+            (document.querySelector(".stage > .minion") as HTMLElement).hidden = true;
+        });
+
+        const box = (await page.locator(".keypad").boundingBox())!;
+        expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+        const overflow = await page.evaluate(() => ({
+            y: document.documentElement.scrollHeight - window.innerHeight,
+            x: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        }));
+        expect(overflow.y).toBeLessThanOrEqual(0);
+        expect(overflow.x).toBeLessThanOrEqual(0);
+    });
+}

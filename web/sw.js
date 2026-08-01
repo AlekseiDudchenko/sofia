@@ -1,7 +1,7 @@
 /* Service worker: приложение целиком уходит в офлайн после первой загрузки.
  * VERSION подставляется скриптом scripts/stamp-version.mjs из package.json —
  * смена версии катит новый кэш и выбрасывает старый. */
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 const CACHE = `umnozhenie-${VERSION}`;
 
 /* Скомпилированные модули. Список подставляет scripts/stamp-version.mjs после
@@ -25,6 +25,7 @@ const MODULES = [
     "./js/ui/drill.js",
     "./js/ui/home.js",
     "./js/ui/keypad.js",
+    "./js/ui/minion.js",
     "./js/ui/sound-toggle.js",
     "./js/ui/sprint.js",
 ];

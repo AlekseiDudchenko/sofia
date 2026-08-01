@@ -13,6 +13,12 @@
     --good: #34d399;
     --bad: #fb7185;
     --gold: #fbbf24;
+    /* Миньоны: жёлтый корпус, синий комбинезон, стальная оправа. */
+    --minion: #ffd93b;
+    --denim: #3a6ec4;
+    --denim-dark: #2a4f92;
+    --goggle: #c7d0e2;
+    --strap: #23273f;
     --radius: 18px;
     /* Высота клавиши тянется за высотой экрана: на низком экране четыре ряда
        обязаны поместиться целиком, на высоком — не мельчить. */
@@ -133,12 +139,103 @@ button {
 /* Выключенный звук виден и без подписи — приглушаем иконку сильнее. */
 .icon-btn.quiet[aria-pressed="false"] { opacity: 0.45; }
 
+/* ── Миньоны ───────────────────────────────────────────────────────────── */
+
+/* Контур рисует src/ui/minion.ts, здесь только краски и мимика. Цвета живут
+   тут, а не в разметке: иначе смена палитры означала бы правку TypeScript. */
+
+.minion {
+    display: block;
+    flex: none;
+    width: var(--minion-size, 72px);
+}
+
+/* overflow: visible — искры ликования и «zzz» выходят за viewBox. */
+.minion svg { display: block; width: 100%; height: auto; overflow: visible; }
+
+.minion-sm { --minion-size: 38px; }
+.minion-md { --minion-size: clamp(58px, 14vw, 78px); }
+.minion-lg { --minion-size: clamp(86px, 20vh, 130px); }
+
+/* Ещё не заработанный миньон команды: виден силуэт, но он «не пришёл». */
+.minion.off { filter: grayscale(1); opacity: 0.3; }
+
+.m-body { fill: var(--minion); }
+/* Комбинезон, волосы и ботинки у миньона чёрные, но фон приложения тёмный:
+   в чёрном они на нём просто исчезают. Держим их шиферными — силуэт читается
+   и на подложке карточки, и на фоне страницы. */
+.m-legs rect { fill: #3d4370; }
+.m-hair path { fill: none; stroke: #3d4370; stroke-width: 3; stroke-linecap: round; }
+.m-arm path { fill: none; stroke: var(--minion); stroke-width: 11; stroke-linecap: round; }
+.m-arm circle { fill: var(--minion); }
+
+.m-overalls { fill: var(--denim); }
+.m-brace { fill: none; stroke: var(--denim); stroke-width: 6; stroke-linecap: round; }
+.m-button { fill: var(--gold); }
+.m-pocket { fill: var(--denim-dark); }
+.m-stitch { fill: none; stroke: rgba(255, 255, 255, 0.45); stroke-width: 2; stroke-linecap: round; }
+
+.m-strap { fill: var(--strap); }
+.m-goggle { fill: var(--goggle); }
+.m-white { fill: #fff; }
+.m-iris { fill: #7a4b2a; }
+.m-pupil { fill: #14141f; }
+.m-shine { fill: rgba(255, 255, 255, 0.9); }
+/* Веко — тот же круг, что и белок, сплющенный по вертикали к нулю. Так оно
+   не вылезает за глаз ни при каком размере и не требует обрезки. */
+.m-lid { fill: var(--minion); transform: scaleY(0); }
+
+.m-mouth { fill: none; stroke: #43261a; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
+.m-mouth-fill { fill: #43261a; }
+.m-tongue { fill: #ff8fa3; }
+.m-spark { fill: var(--gold); }
+.m-zzz { fill: var(--muted); font: 700 13px system-ui, sans-serif; }
+.m-zzz-2 { font-size: 10px; opacity: 0.7; }
+
+/* Мимика по настроению */
+.is-sleepy .m-lid { transform: scaleY(0.78); }
+.is-oops .m-lid { transform: scaleY(0.4); }
+/* Взгляд вниз — досада читается зрачком раньше, чем ртом. */
+.is-oops .m-iris, .is-oops .m-pupil, .is-oops .m-shine { transform: translateY(3px); }
+
+.m-arm { transform-box: view-box; }
+.m-arm-l { transform-origin: 22px 64px; }
+.m-arm-r { transform-origin: 78px 64px; }
+/* Руки вверх — но вдоль тела, иначе кисти уходят за край кадра. */
+.is-cheer .m-arm-l { transform: rotate(128deg); }
+.is-cheer .m-arm-r { transform: rotate(-128deg); }
+
+@keyframes m-bob { 50% { transform: translateY(-2.5%); } }
+@keyframes m-blink { 0%, 92%, 100% { transform: scaleY(0); } 95%, 97% { transform: scaleY(1); } }
+@keyframes m-jump { 30% { transform: translateY(-9%); } 55% { transform: translateY(0); } 72% { transform: translateY(-4%); } }
+@keyframes m-shake { 25% { transform: rotate(-5deg); } 75% { transform: rotate(5deg); } }
+
+.minion svg { animation: m-bob 3.4s ease-in-out var(--blink-delay, 0s) infinite; }
+.minion.is-idle .m-lid, .minion.is-happy .m-lid { animation: m-blink 5.6s var(--blink-delay, 0s) infinite; }
+
+/* Прыжок и досада живут на самом svg: setMinionMood() пересобирает его, и
+   анимация запускается заново на каждой смене настроения — иначе второй
+   такой же ответ подряд остался бы без реакции. */
+.minion.is-cheer svg { animation: m-jump 0.85s ease-in-out 2, m-bob 3.4s ease-in-out 1.7s infinite; }
+.minion.is-oops svg { transform-origin: 50% 90%; animation: m-shake 0.5s ease-in-out 2, m-bob 3.4s ease-in-out 1s infinite; }
+
 /* ── Дневная норма ─────────────────────────────────────────────────────── */
 
 .daily {
     background: var(--surface);
     border-radius: var(--radius);
     padding: 14px 16px;
+}
+
+/* Миньон слева, норма справа: он и есть индикатор — спит до первого ответа,
+   ликует, когда норма закрыта. */
+.daily-row { display: flex; align-items: center; gap: 14px; }
+.daily-text { flex: 1; min-width: 0; }
+
+.minion-say {
+    margin: 9px 0 0;
+    font-size: 0.85rem;
+    color: var(--muted);
 }
 
 .daily-head {
@@ -269,6 +366,31 @@ button {
     vertical-align: -1px;
 }
 
+/* ── Команда ───────────────────────────────────────────────────────────── */
+
+/* Шесть миньонов на 36 фактов: каждый приходит за шесть выученных карточек.
+   Карта показывает, что осталось, команда — сколько уже сделано. */
+
+.crew { background: var(--surface); border-radius: var(--radius); padding: 14px 16px; }
+
+.crew-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+    margin-bottom: 8px;
+}
+
+.crew-head h2 { margin: 0; font-size: 1rem; }
+.crew-head span { font-size: 0.87rem; color: var(--muted); }
+
+/* Шестеро в ряд ужимаются до ширины карточки: flex-basis задаёт желаемый
+   размер, а не жёсткий — на узком экране они просто становятся мельче. */
+.crew-row { display: flex; justify-content: center; gap: clamp(4px, 2.5vw, 18px); }
+.crew-row .minion { width: auto; flex: 0 1 60px; }
+.crew .minion-say { text-align: center; }
+
 /* ── Экран тренировки ──────────────────────────────────────────────────── */
 
 .play {
@@ -314,6 +436,10 @@ button {
     justify-content: center;
     gap: clamp(8px, 2.2vh, 18px);
 }
+
+/* Миньон на тренировке кивает на каждый ответ. Размер привязан к высоте
+   экрана: он здесь гость, четыре ряда клавиш важнее. */
+.stage .minion { --minion-size: clamp(42px, 8.5vh, 76px); }
 
 .question {
     /* Ограничение и по ширине, и по высоте: в альбомной ориентации 13vw
@@ -382,6 +508,7 @@ button {
 
 .result { text-align: center; padding: 8px 0 4px; }
 .result h2 { margin: 0 0 6px; font-size: 1.5rem; }
+.result .minion { margin: 0 auto 8px; }
 .result .big {
     font-size: 3.4rem;
     font-weight: 800;
@@ -513,6 +640,10 @@ button {
         grid-auto-rows: minmax(0, 1fr);
         gap: 8px;
     }
+
+    /* Миньону в колонке с примером места нет: он отнимает высоту у ответа. */
+    .stage .minion { display: none; }
+    .result .minion { --minion-size: clamp(70px, 26vh, 96px); }
 
     .key { height: auto; font-size: clamp(1.1rem, 5.5vh, 1.7rem); }
     .question { font-size: clamp(1.9rem, 11vh, 3rem); }

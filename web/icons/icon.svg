@@ -1,13 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Знак умножения">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Миньон со знаком умножения">
+  <!-- Та же фигура, что рисует scripts/make-icons.mjs для PNG: жёлтая капсула,
+       полоса очков и знак умножения вместо зрачка. Правку нужно повторять в
+       обоих местах — общего источника у растра и вектора здесь нет. -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#7c6cff"/>
       <stop offset="1" stop-color="#4c3fd0"/>
     </linearGradient>
+    <clipPath id="body"><rect x="159" y="102" width="194" height="308" rx="97"/></clipPath>
+    <clipPath id="eye"><circle cx="256" cy="212" r="60"/></clipPath>
   </defs>
+
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
-  <g stroke="#ffffff" stroke-width="54" stroke-linecap="round">
-    <line x1="174" y1="174" x2="338" y2="338"/>
-    <line x1="338" y1="174" x2="174" y2="338"/>
+
+  <g stroke="#23273f" stroke-width="11" stroke-linecap="round">
+    <path d="M241 105 223 74"/>
+    <path d="M271 105 289 74"/>
+  </g>
+
+  <rect x="159" y="102" width="194" height="308" rx="97" fill="#ffd93b"/>
+  <g clip-path="url(#body)">
+    <rect x="159" y="310" width="194" height="100" fill="#4d8ce8"/>
+    <rect x="140" y="193" width="232" height="39" fill="#23273f"/>
+  </g>
+
+  <circle cx="256" cy="212" r="79" fill="#c7d0e2"/>
+  <circle cx="256" cy="212" r="60" fill="#ffffff"/>
+  <g clip-path="url(#eye)" stroke="#4c3fd0" stroke-width="21" stroke-linecap="round">
+    <path d="M234 190 278 234"/>
+    <path d="M278 190 234 234"/>
   </g>
 </svg>

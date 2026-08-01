@@ -9,6 +9,7 @@ import { loadCards, saveCards, getOrCreate, recordAnswer } from "../store.js";
 import { go } from "../router.js";
 import { play } from "../sound.js";
 import { render, qs, onAction, formatSeconds, plural } from "./dom.js";
+import { minionHTML, setMinionMood, randomEyes } from "./minion.js";
 import { keypadHTML, bindKeypad } from "./keypad.js";
 import { SOUND_ACTION, soundIconHTML, toggleSound } from "./sound-toggle.js";
 
@@ -48,6 +49,7 @@ export function showDrill(): () => void {
                 <div class="score" id="left"></div>
             </div>
             <div class="stage">
+                ${minionHTML({ eyes: randomEyes(), size: "md" })}
                 <div class="question" id="question"></div>
                 <div class="slot" id="slot"></div>
                 <div class="hint" id="hint"></div>
@@ -56,6 +58,7 @@ export function showDrill(): () => void {
         </div>
     `);
 
+    const minionEl = qs(".minion", scope);
     const questionEl = qs("#question", scope);
     const slotEl = qs("#slot", scope);
     const hintEl = qs("#hint", scope);
@@ -88,6 +91,7 @@ export function showDrill(): () => void {
         hintEl.textContent = "";
         hintEl.className = "hint";
         paintSlot("");
+        setMinionMood(minionEl, "idle");
 
         const total = answered + remaining.length + 1;
         progressEl.style.width = `${Math.round((answered / total) * 100)}%`;
@@ -135,6 +139,9 @@ export function showDrill(): () => void {
             if (result.timingTrusted) latencies.push(latency);
             play(result.speed === "fast" ? "fast" : "correct");
             paintSlot("correct");
+            // Быстрый ответ миньон празднует прыжком, обычный — просто улыбкой:
+            // иначе разницы между «вспомнила» и «досчитала» не видно.
+            setMinionMood(minionEl, result.speed === "fast" ? "cheer" : "happy");
             slotEl.classList.add("pop");
             hintEl.textContent = result.speed === "fast" ? "Быстро!" : "";
             later(next, CORRECT_PAUSE_MS);
@@ -143,6 +150,7 @@ export function showDrill(): () => void {
             play("wrong");
             const { left, right } = orientation(current, flip);
             paintSlot("wrong");
+            setMinionMood(minionEl, "oops");
             hintEl.className = "hint bad";
             hintEl.textContent = `${left} × ${right} = ${current.product}`;
             remaining = requeue(remaining, current);
@@ -188,9 +196,14 @@ function showDrillSummary(result: DrillResult): void {
         ? `<div class="tough"><h3>Сегодня не пошли — вернутся завтра</h3><ul>${toughList}</ul></div>`
         : `<div class="tough"><h3>Ни одной ошибки. Так держать!</h3></div>`;
 
+    // Настроение итогов — по ошибкам, а не по точности: для ребёнка «ни одной»
+    // и «одна» — разные новости, а 92% против 87% не значат ничего.
+    const mood = result.missed.length === 0 ? "cheer" : result.missed.length <= 2 ? "happy" : "idle";
+
     const scope = render(`
         <div class="top"><h1>Готово</h1></div>
         <div class="result">
+            ${minionHTML({ mood, eyes: randomEyes(), size: "lg" })}
             <div class="big">${result.correct} / ${result.answered}</div>
             <p class="action-sub">${plural(result.answered, "ответ", "ответа", "ответов")} за подход</p>
         </div>
@@ -214,6 +227,7 @@ function showAllDone(): () => void {
     const scope = render(`
         <div class="top"><h1>На сегодня всё</h1></div>
         <div class="result">
+            ${minionHTML({ mood: "sleepy", eyes: randomEyes(), size: "lg" })}
             <div class="big">✓</div>
             <p class="action-sub">Все повторения закрыты. Новые факты откроются завтра — так они лучше запомнятся.</p>
         </div>

@@ -9,7 +9,11 @@ import {
 } from "../store.js";
 import { go } from "../router.js";
 import { render, onAction, plural } from "./dom.js";
+import { minionHTML, type MinionMood } from "./minion.js";
 import { SOUND_ACTION, soundToolHTML, toggleSound } from "./sound-toggle.js";
+
+/** Шестеро на 36 фактов: миньон приходит в команду за каждые шесть выученных. */
+const CREW_SIZE = 6;
 
 export function showHome(): () => void {
     const today = dayKey(new Date());
@@ -37,11 +41,17 @@ export function showHome(): () => void {
         </div>
 
         <div class="daily">
-            <div class="daily-head">
-                <span>Сегодня</span>
-                <b>${stats.answers} / ${DAILY_GOAL}</b>
+            <div class="daily-row">
+                ${minionHTML({ mood: dailyMood(goalPct), eyes: 1 })}
+                <div class="daily-text">
+                    <div class="daily-head">
+                        <span>Сегодня</span>
+                        <b>${stats.answers} / ${DAILY_GOAL}</b>
+                    </div>
+                    <div class="bar${goalDone ? " done" : ""}"><span style="width:${goalPct}%"></span></div>
+                    <p class="minion-say">${dailySay(goalPct)}</p>
+                </div>
             </div>
-            <div class="bar${goalDone ? " done" : ""}"><span style="width:${goalPct}%"></span></div>
         </div>
 
         <div class="actions">
@@ -62,6 +72,8 @@ export function showHome(): () => void {
                 ${best ? `<span class="pill">${best}</span>` : ""}
             </button>
         </div>
+
+        ${crewHTML(mastered)}
 
         <div class="map">
             <div class="map-head">
@@ -103,6 +115,53 @@ export function showHome(): () => void {
     });
 
     return () => {};
+}
+
+/** Настроение миньона на главной — это и есть индикатор дневной нормы:
+ *  спит, пока не начали, ликует, когда норма закрыта. */
+function dailyMood(pct: number): MinionMood {
+    if (pct === 0) return "sleepy";
+    if (pct >= 100) return "cheer";
+    return pct >= 60 ? "happy" : "idle";
+}
+
+function dailySay(pct: number): string {
+    if (pct === 0) return "Бана-а-ана! Начнём?";
+    if (pct >= 100) return "Норма закрыта. Ты сегодня молодец!";
+    return pct >= 60 ? "Уже почти — дожимаем!" : "Считаем дальше, я смотрю.";
+}
+
+/** Ряд миньонов: заработанные в цвете, остальные — тенями.
+ *
+ * Карта таблицы показывает, что осталось выучить, и от неё всегда немного
+ * грустно. Команда показывает то же самое с другой стороны — сколько уже
+ * сделано, — и растёт заметными скачками, а не по одной клетке. */
+function crewHTML(mastered: number): string {
+    const perMinion = DECK.length / CREW_SIZE;
+    const joined = Math.floor(mastered / perMinion);
+    const toNext = perMinion - (mastered % perMinion);
+
+    const note = joined >= CREW_SIZE
+        ? "Вся команда в сборе"
+        : `Ещё ${toNext} ${plural(toNext, "факт", "факта", "фактов")} — и придёт новый`;
+
+    const row = Array.from({ length: CREW_SIZE }, (_, i) => minionHTML({
+        size: "sm",
+        eyes: i % 3 === 1 ? 1 : 2,
+        mood: i < joined ? "happy" : "sleepy",
+        extra: i < joined ? "" : "off",
+    })).join("");
+
+    return `
+        <div class="crew">
+            <div class="crew-head">
+                <h2>Команда</h2>
+                <span>${joined} из ${CREW_SIZE}</span>
+            </div>
+            <div class="crew-row">${row}</div>
+            <p class="minion-say">${note}</p>
+        </div>
+    `;
 }
 
 /** Класс клетки по ступени освоения — этим карта и раскрашивается. */

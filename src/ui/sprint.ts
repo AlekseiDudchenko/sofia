@@ -14,6 +14,7 @@ import { loadCards, recordAnswer, bestSprint, submitSprint } from "../store.js";
 import { go } from "../router.js";
 import { play } from "../sound.js";
 import { render, qs, onAction, plural } from "./dom.js";
+import { minionHTML, setMinionMood, randomEyes } from "./minion.js";
 import { keypadHTML, bindKeypad } from "./keypad.js";
 import { SOUND_ACTION, soundIconHTML, toggleSound } from "./sound-toggle.js";
 
@@ -50,6 +51,7 @@ export function showSprint(): () => void {
                 <div class="pill score-pill">⚡&nbsp;<b id="score">0</b></div>
             </div>
             <div class="stage">
+                ${minionHTML({ eyes: randomEyes(), size: "md" })}
                 <div class="question" id="question"></div>
                 <div class="slot" id="slot"></div>
                 <div class="hint" id="hint"></div>
@@ -58,6 +60,7 @@ export function showSprint(): () => void {
         </div>
     `);
 
+    const minionEl = qs(".minion", scope);
     const questionEl = qs("#question", scope);
     const slotEl = qs("#slot", scope);
     const hintEl = qs("#hint", scope);
@@ -107,6 +110,7 @@ export function showSprint(): () => void {
         hintEl.textContent = "";
         hintEl.className = "hint";
         paintSlot("");
+        setMinionMood(minionEl, "idle");
     }
 
     function onDigit(digit: string): void {
@@ -125,11 +129,14 @@ export function showSprint(): () => void {
             scoreEl.textContent = String(score);
             play("correct");
             paintSlot("correct");
+            // Пауза здесь 220 мс — прыжок не успел бы, поэтому улыбка.
+            setMinionMood(minionEl, "happy");
             later(next, CORRECT_PAUSE_MS);
         } else {
             play("wrong");
             const { left, right } = orientation(current, flip);
             paintSlot("wrong");
+            setMinionMood(minionEl, "oops");
             hintEl.className = "hint bad";
             hintEl.textContent = `${left} × ${right} = ${current.product}`;
             later(next, WRONG_PAUSE_MS);
@@ -172,6 +179,7 @@ function showSprintSummary(score: number, attempts: number, isRecord: boolean): 
     const scope = render(`
         <div class="top"><h1>Минута вышла</h1></div>
         <div class="result">
+            ${minionHTML({ mood: isRecord ? "cheer" : score > 0 ? "happy" : "idle", eyes: randomEyes(), size: "lg" })}
             <div class="big">${score}</div>
             <p class="action-sub">${plural(score, "правильный ответ", "правильных ответа", "правильных ответов")}</p>
             ${isRecord ? `<p class="record">Новый рекорд!</p>` : ""}

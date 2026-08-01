@@ -1,9 +1,15 @@
 /* Генерация PNG-иконок без внешних зависимостей.
  *
- * Иконка простая (скруглённый квадрат с косым крестом), поэтому растеризуется
- * аналитически по знаковому расстоянию, а PNG собирается из zlib, который есть
- * в самом Node. Так в проекте не заводится ни sharp, ни ImageMagick ради
- * четырёх картинок, которые меняются раз в никогда.
+ * Иконка складывается из десятка простых фигур (капсула, полоса, круги, косой
+ * крест), поэтому растеризуется аналитически по знаковому расстоянию, а PNG
+ * собирается из zlib, который есть в самом Node. Так в проекте не заводится ни
+ * sharp, ни ImageMagick ради четырёх картинок, которые меняются раз в никогда.
+ *
+ * Рисуем миньона, у которого вместо зрачка знак умножения: на домашнем экране
+ * значок опознаётся ребёнком по жёлтому силуэту, а не по названию.
+ *
+ * Держать это в согласии с web/icons/icon.svg приходится вручную — там та же
+ * фигура, но контурами. Расхождение увидит только глаз, тестом его не поймать.
  *
  * Запуск вручную после правки иконки: node scripts/make-icons.mjs
  */
@@ -23,9 +29,9 @@ function coverage(distance) {
     return Math.min(1, Math.max(0, 0.5 - distance));
 }
 
-function roundedBoxDistance(x, y, half, radius) {
-    const dx = Math.abs(x) - (half - radius);
-    const dy = Math.abs(y) - (half - radius);
+function roundedRectDistance(x, y, halfW, halfH, radius) {
+    const dx = Math.abs(x) - (halfW - radius);
+    const dy = Math.abs(y) - (halfH - radius);
     const ox = Math.max(dx, 0);
     const oy = Math.max(dy, 0);
     return Math.hypot(ox, oy) + Math.min(Math.max(dx, dy), 0) - radius;
@@ -38,40 +44,81 @@ function segmentDistance(px, py, ax, ay, bx, by) {
     return Math.hypot(px - (ax + vx * t), py - (ay + vy * t));
 }
 
+/** Пересечение фигур по знаковому расстоянию — этим фигура «обрезается» по
+ *  телу: полоса очков и комбинезон нарисованы во всю ширину и живут только
+ *  там, где под ними жёлтая капсула. */
+function intersect(a, b) {
+    return Math.max(a, b);
+}
+
+/* Пропорции фигуры в долях от стороны иконки, от её центра. Одни и те же
+ * числа лежат в web/icons/icon.svg — там они умножены на 512. */
+const BODY_W = 0.19;
+const BODY_H = 0.30;
+const EYE_Y = -0.085;
+const GOGGLE_R = 0.155;
+const WHITE_R = 0.118;
+const STRAP_H = 0.038;
+const OVERALLS_Y = 0.105;
+const CROSS_ARM = 0.062;
+const CROSS_HALF = 0.021;
+const HAIR_HALF = 0.011;
+
 function renderIcon(size, { maskable }) {
     const pixels = Buffer.alloc(size * size * 4);
     const half = size / 2;
     const radius = maskable ? 0 : size * 0.22;
-    // У maskable-иконки углы срезает система, поэтому крест держим в
-    // безопасной центральной зоне, а фон разливаем на весь квадрат.
-    const armFrom = maskable ? size * 0.36 : size * 0.34;
-    const armTo = size - armFrom;
-    const strokeHalf = size * (maskable ? 0.049 : 0.053);
+    // У maskable-иконки края срезает система: фон разливаем на весь квадрат,
+    // а самого миньона ужимаем в безопасную центральную зону.
+    const s = size * (maskable ? 0.78 : 1);
 
     for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
-            const cx = x + 0.5;
-            const cy = y + 0.5;
+            // Координаты от центра иконки — в них и заданы все пропорции.
+            const px = x + 0.5 - half;
+            const py = y + 0.5 - half;
 
-            const bgAlpha = maskable
-                ? 1
-                : coverage(roundedBoxDistance(cx - half, cy - half, half, radius));
+            const bgAlpha = maskable ? 1 : coverage(roundedRectDistance(px, py, half, half, radius));
 
             // Диагональный градиент, как в SVG: #7c6cff → #4c3fd0
-            const t = (cx + cy) / (2 * size);
+            const t = (px + py + size) / (2 * size);
             let r = mix(0x7c, 0x4c, t);
             let g = mix(0x6c, 0x3f, t);
             let b = mix(0xff, 0xd0, t);
 
-            const cross = Math.min(
-                segmentDistance(cx, cy, armFrom, armFrom, armTo, armTo),
-                segmentDistance(cx, cy, armTo, armFrom, armFrom, armTo),
-            );
-            const crossAlpha = coverage(cross - strokeHalf);
+            const paint = (distance, cr, cg, cb) => {
+                const alpha = coverage(distance);
+                if (alpha <= 0) return;
+                r = mix(r, cr, alpha);
+                g = mix(g, cg, alpha);
+                b = mix(b, cb, alpha);
+            };
 
-            r = mix(r, 255, crossAlpha);
-            g = mix(g, 255, crossAlpha);
-            b = mix(b, 255, crossAlpha);
+            // Волоски торчат из-за головы, поэтому идут до тела.
+            const hair = Math.min(
+                segmentDistance(px, py, -0.03 * s, -BODY_H * s, -0.065 * s, -0.355 * s),
+                segmentDistance(px, py, 0.03 * s, -BODY_H * s, 0.065 * s, -0.355 * s),
+            );
+            paint(hair - HAIR_HALF * s, 0x23, 0x27, 0x3f);
+
+            // Тело — капсула: радиус скругления равен половине ширины.
+            const body = roundedRectDistance(px, py, BODY_W * s, BODY_H * s, BODY_W * s);
+            paint(body, 0xff, 0xd9, 0x3b);
+            paint(intersect(body, OVERALLS_Y * s - py), 0x4d, 0x8c, 0xe8);
+            paint(intersect(body, Math.abs(py - EYE_Y * s) - STRAP_H * s), 0x23, 0x27, 0x3f);
+
+            const eye = Math.hypot(px, py - EYE_Y * s);
+            paint(eye - GOGGLE_R * s, 0xc7, 0xd0, 0xe2);
+            const white = eye - WHITE_R * s;
+            paint(white, 0xff, 0xff, 0xff);
+
+            // Знак умножения вместо зрачка — обрезан по белку глаза.
+            const arm = CROSS_ARM * s * 0.7071;
+            const cross = Math.min(
+                segmentDistance(px, py - EYE_Y * s, -arm, -arm, arm, arm),
+                segmentDistance(px, py - EYE_Y * s, arm, -arm, -arm, arm),
+            );
+            paint(intersect(cross - CROSS_HALF * s, white), 0x4c, 0x3f, 0xd0);
 
             const offset = (y * size + x) * 4;
             pixels[offset] = Math.round(r);

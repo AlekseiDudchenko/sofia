@@ -1,4 +1,21 @@
 import { test, expect, type Page } from "@playwright/test";
+import { spawn } from "node:child_process";
+import { connect } from "node:net";
+import { fileURLToPath } from "node:url";
+
+/** Ждёт, пока порт начнёт (up = true) или перестанет принимать соединения. */
+async function waitForServer(port: number, up: boolean): Promise<void> {
+    for (let i = 0; i < 100; i++) {
+        const listening = await new Promise<boolean>((resolve) => {
+            const socket = connect({ port, host: "127.0.0.1" });
+            socket.on("connect", () => { socket.destroy(); resolve(true); });
+            socket.on("error", () => resolve(false));
+        });
+        if (listening === up) return;
+        await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error(`сервер на порту ${port} так и не ${up ? "поднялся" : "погас"}`);
+}
 
 /** Читает текущий пример с экрана и возвращает правильный ответ. */
 async function currentProduct(page: Page): Promise<number> {
@@ -186,6 +203,54 @@ test("действие с общим именем не срабатывает д
     await page.click('[data-act="sound"]');
     await expect(page.locator('[data-act="sound"]')).toHaveAttribute("aria-pressed", "false");
     expect(await page.evaluate(() => localStorage.getItem("sofia.sound.v1"))).toBe('{"on":false}');
+});
+
+/* Обещание «интернет нужен один раз» — не лозунг с главной, а поведение.
+ *
+ * Первая загрузка идёт мимо сервис-воркера: он в этот момент только ставится
+ * и наполняет кэш списком SHELL. Значит, офлайн после неё поднимется ровно
+ * настолько, насколько SHELL полон. Пока в нём лежал один main.js, тренировка
+ * без сети упиралась в белый экран: import router.js уходил в мёртвую сеть.
+ *
+ * Сеть рвём по-настоящему, гася сервер. context.setOffline() здесь бесполезен:
+ * он глушит запросы страницы, но не запросы сервис-воркера — тот продолжает
+ * ходить в сеть, и тест проходит независимо от содержимого кэша. */
+test("после первой загрузки приложение работает без сети", async ({ browser }) => {
+    const port = 5199;
+    const server = spawn("node", ["scripts/dev-server.mjs"], {
+        cwd: fileURLToPath(new URL("..", import.meta.url)),
+        env: { ...process.env, PORT: String(port) },
+        stdio: "ignore",
+    });
+
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    try {
+        await waitForServer(port, true);
+        await page.goto(`http://localhost:${port}/`);
+        // Воркер встал и разложил SHELL по кэшу.
+        await page.evaluate(() => navigator.serviceWorker.ready);
+        await expect(page.locator('[data-act="drill"]')).toBeVisible();
+
+        server.kill("SIGKILL");
+        await waitForServer(port, false);
+
+        await page.reload();
+        // Главная собирается модулями из web/js — если хоть одного нет в кэше,
+        // приложение не отрисуется вовсе.
+        await expect(page.locator('[data-act="drill"]')).toBeVisible();
+        await expect(page.locator(".grid .cell")).toHaveCount(81);
+
+        // И тренировка тоже: её экран тянет ещё несколько модулей.
+        await page.click('[data-act="drill"]');
+        await page.waitForSelector("#question");
+        await type(page, await currentProduct(page));
+        await expect(page.locator(".slot")).toHaveClass(/correct/);
+    } finally {
+        server.kill("SIGKILL");
+        await context.close();
+    }
 });
 
 test("спринт считает очки и идёт по таймеру", async ({ page }) => {

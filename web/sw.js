@@ -4,16 +4,39 @@
 const VERSION = "0.2.0";
 const CACHE = `umnozhenie-${VERSION}`;
 
-/* Минимум, чтобы приложение поднялось без сети. Скомпилированные модули
- * подтягиваются тем же обработчиком при первой загрузке — они грузятся сразу,
- * так что к моменту первого офлайна уже лежат в кэше. */
+/* Скомпилированные модули. Список подставляет scripts/stamp-version.mjs после
+ * tsc — руками его не правят.
+ *
+ * Нужен он целиком, а не одним main.js: смена версии заводит новый кэш, а
+ * activate сносит старый. Всё, чего нет в SHELL, из кэша при этом пропадает и
+ * подтягивается из сети только при следующем запуске. Уйти в офлайн в этом
+ * промежутке означало бы белый экран — import упёрся бы в Response.error(). */
+const MODULES = [
+    "./js/answer.js",
+    "./js/facts.js",
+    "./js/main.js",
+    "./js/rating.js",
+    "./js/router.js",
+    "./js/scheduler.js",
+    "./js/session.js",
+    "./js/sound.js",
+    "./js/store.js",
+    "./js/ui/dom.js",
+    "./js/ui/drill.js",
+    "./js/ui/home.js",
+    "./js/ui/keypad.js",
+    "./js/ui/sound-toggle.js",
+    "./js/ui/sprint.js",
+];
+
+/* Всё, что нужно, чтобы приложение поднялось без сети. */
 const SHELL = [
     "./",
     "./index.html",
     "./style.css",
     "./manifest.webmanifest",
-    "./js/main.js",
     "./icons/icon.svg",
+    ...MODULES,
 ];
 
 self.addEventListener("install", (event) => {

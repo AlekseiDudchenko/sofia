@@ -287,8 +287,13 @@ test.describe("подсказка миньонами", () => {
         await expect(page.locator(".arow")).toHaveCount(0);
         await page.click('[data-act="hint"]');
 
-        await expect(page.locator(".arow")).toHaveCount(left);
-        await expect(page.locator(".arow").first().locator(".minion")).toHaveCount(right);
+        // Первое число — ряды, но строй длиннее пяти рядов кладётся на бок:
+        // 9 × 2 показывается тем же строем, что и 2 × 9 (см. arrayShape).
+        const rows = left <= 5 ? left : right;
+        const cols = left <= 5 ? right : left;
+
+        await expect(page.locator(".arow")).toHaveCount(rows);
+        await expect(page.locator(".arow").first().locator(".minion")).toHaveCount(cols);
         await expect(page.locator("#array .minion")).toHaveCount(left * right);
         // Маскот уходит: вдвоём со строем им тесно.
         await expect(page.locator(".stage > .minion")).toBeHidden();

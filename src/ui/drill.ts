@@ -10,7 +10,7 @@ import { go } from "../router.js";
 import { play } from "../sound.js";
 import { render, qs, onAction, formatSeconds, plural } from "./dom.js";
 import { minionHTML, setMinionMood, randomEyes, type MinionMood } from "./minion.js";
-import { hasArray, arrayHTML, setArrayMood } from "./array.js";
+import { hasArray, arrayShape, arrayHTML, setArrayMood } from "./array.js";
 import { keypadHTML, bindKeypad } from "./keypad.js";
 import { SOUND_ACTION, soundIconHTML, toggleSound } from "./sound-toggle.js";
 
@@ -138,11 +138,13 @@ export function showDrill(): () => void {
         if (locked || hinted || !current) return;
         const { left, right } = orientation(current, flip);
 
+        const { rows, cols } = arrayShape(left, right);
+
         hinted = true;
-        arrayEl.innerHTML = arrayHTML(left, right);
+        arrayEl.innerHTML = arrayHTML(rows, cols);
         // Число рядов уходит в CSS: от него зависит, сколько высоты строй
         // вправе занять, — два ряда не должны раздуваться на весь экран.
-        arrayEl.style.setProperty("--rows", String(left));
+        arrayEl.style.setProperty("--rows", String(rows));
         // Классом экран отдаёт строю ещё немного высоты: пример и поле ответа
         // ужимаются, потому что считать по картинке сейчас важнее.
         stageEl.classList.add("with-array");

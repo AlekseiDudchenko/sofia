@@ -36,7 +36,7 @@ export function showHome(): () => void {
         <div class="top">
             <h1 class="long">Таблица умножения миньонов для Сони из Томска</h1>
             <span class="streak${streak ? "" : " cold"}">
-                ${streak ? "🔥" : "·"} ${streak} ${plural(streak, "день", "дня", "дней")}
+                ${streak ? "🔥" : "·"} ${streak} ${plural(streak, "миньон", "миньона", "миньонов")}
             </span>
         </div>
 

@@ -1,0 +1,12 @@
+node_modules/
+
+# Compiled output: tsc writes src/ -> web/js/, CI rebuilds it.
+web/js/
+
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+.DS_Store
+.vscode/
+.idea/

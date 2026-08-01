@@ -1,0 +1,417 @@
+/* Тренажёр таблицы умножения — тёмная тема, крупные тапы, никакой мелочи.
+   Расчёт на телефон в руке одиннадцатилетнего ребёнка. */
+
+:root {
+    --bg: #0d0f1e;
+    --surface: #181b33;
+    --surface-2: #22264a;
+    --line: #2f3560;
+    --text: #eef0ff;
+    --muted: #9aa0cc;
+    --accent: #7c6cff;
+    --accent-soft: #3a3270;
+    --good: #34d399;
+    --bad: #fb7185;
+    --gold: #fbbf24;
+    --radius: 18px;
+    --tap: 62px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+}
+
+body { overscroll-behavior: none; }
+
+.app {
+    max-width: 560px;
+    margin: 0 auto;
+    min-height: 100%;
+    padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+button {
+    font: inherit;
+    color: inherit;
+    border: none;
+    background: none;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+
+/* ── Шапка ─────────────────────────────────────────────────────────────── */
+
+.top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 44px;
+}
+
+.top h1 {
+    margin: 0;
+    font-size: 1.35rem;
+    letter-spacing: -0.01em;
+}
+
+.streak {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 13px;
+    border-radius: 999px;
+    background: var(--surface);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.streak.cold { color: var(--muted); font-weight: 500; }
+
+.icon-btn {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: var(--surface);
+    font-size: 1.25rem;
+    display: grid;
+    place-items: center;
+}
+
+.icon-btn:active { background: var(--surface-2); }
+
+/* ── Дневная норма ─────────────────────────────────────────────────────── */
+
+.daily {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+}
+
+.daily-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.9rem;
+    color: var(--muted);
+    margin-bottom: 9px;
+}
+
+.daily-head b { color: var(--text); font-size: 1rem; font-variant-numeric: tabular-nums; }
+
+.bar {
+    height: 10px;
+    border-radius: 999px;
+    background: var(--surface-2);
+    overflow: hidden;
+}
+
+.bar span {
+    display: block;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--accent), #a78bfa);
+    transition: width 0.35s ease;
+}
+
+.bar.done span { background: linear-gradient(90deg, var(--good), #6ee7b7); }
+
+/* ── Крупные кнопки действий ───────────────────────────────────────────── */
+
+.actions { display: grid; gap: 12px; }
+
+.action {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+    padding: 18px;
+    border-radius: var(--radius);
+    background: var(--surface);
+    text-align: left;
+    transition: transform 0.08s ease;
+}
+
+.action:active { transform: scale(0.985); }
+.action.primary { background: linear-gradient(135deg, var(--accent), #5b4bd6); }
+
+.action-emoji { font-size: 1.9rem; line-height: 1; }
+.action-text { display: block; flex: 1; min-width: 0; }
+.action-title { display: block; font-size: 1.12rem; font-weight: 700; }
+.action-sub { display: block; font-size: 0.87rem; color: var(--muted); margin-top: 3px; }
+.action.primary .action-sub { color: #d9d2ff; }
+
+.pill {
+    padding: 5px 11px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.16);
+    font-weight: 700;
+    font-size: 0.95rem;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ── Карта таблицы ─────────────────────────────────────────────────────── */
+
+.map { background: var(--surface); border-radius: var(--radius); padding: 16px; }
+
+.map-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+}
+
+.map-head h2 { margin: 0; font-size: 1rem; }
+.map-head span { font-size: 0.87rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(9, 1fr);
+    gap: 4px;
+}
+
+.cell {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    background: var(--surface-2);
+    color: var(--muted);
+}
+
+.cell.head { background: transparent; color: var(--muted); font-weight: 700; }
+.cell.corner { background: transparent; }
+
+/* Ступени освоения: от «не начато» до «на автомате» */
+.cell.b-new { background: var(--surface-2); color: #6d74a8; }
+.cell.b-low { background: #4c2a52; color: #ffc9d6; }
+.cell.b-mid { background: #4a3f7a; color: #cfc6ff; }
+.cell.b-high { background: #2f5d63; color: #b6f0e4; }
+.cell.b-done { background: var(--good); color: #06301f; }
+
+.cell.revealed { outline: 2px solid var(--gold); outline-offset: -2px; }
+
+.legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    margin-top: 12px;
+    font-size: 0.76rem;
+    color: var(--muted);
+}
+
+.legend i {
+    display: inline-block;
+    width: 11px;
+    height: 11px;
+    border-radius: 3px;
+    margin-right: 5px;
+    vertical-align: -1px;
+}
+
+/* ── Экран тренировки ──────────────────────────────────────────────────── */
+
+.play {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.play-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.play-bar .bar { flex: 1; }
+
+.timer {
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    font-size: 1.05rem;
+    min-width: 46px;
+    text-align: right;
+}
+
+.timer.low { color: var(--bad); }
+
+.score { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 1.05rem; }
+
+/* Счёт спринта отделён от таймера плашкой — иначе «60 1» читается как число. */
+.score-pill { background: var(--accent-soft); white-space: nowrap; }
+.score-pill b { font-variant-numeric: tabular-nums; }
+
+.stage {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    min-height: 190px;
+}
+
+.question {
+    font-size: clamp(2.6rem, 13vw, 4rem);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+}
+
+.slot {
+    min-width: 148px;
+    height: 78px;
+    border-radius: 16px;
+    background: var(--surface);
+    border: 2px solid var(--line);
+    display: grid;
+    place-items: center;
+    font-size: 2.5rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.slot.correct { background: var(--good); border-color: var(--good); color: #06301f; }
+.slot.wrong { background: var(--bad); border-color: var(--bad); color: #45091a; }
+.slot .caret { color: var(--muted); font-weight: 400; }
+
+.hint {
+    min-height: 26px;
+    font-size: 1rem;
+    color: var(--muted);
+    text-align: center;
+}
+
+.hint.bad { color: var(--bad); font-weight: 600; }
+
+/* ── Клавиатура ────────────────────────────────────────────────────────── */
+
+.keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+}
+
+.key {
+    height: var(--tap);
+    border-radius: 14px;
+    background: var(--surface);
+    font-size: 1.6rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    display: grid;
+    place-items: center;
+    transition: background 0.08s ease, transform 0.08s ease;
+}
+
+.key:active { background: var(--accent); transform: scale(0.95); }
+.key.wide { grid-column: span 2; }
+.key.util { background: var(--surface-2); font-size: 1.35rem; }
+.key[disabled] { opacity: 0.4; }
+
+/* ── Итоги ─────────────────────────────────────────────────────────────── */
+
+.result { text-align: center; padding: 8px 0 4px; }
+.result h2 { margin: 0 0 6px; font-size: 1.5rem; }
+.result .big {
+    font-size: 3.4rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+.result .record { color: var(--gold); font-weight: 700; margin-top: 6px; }
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin: 18px 0;
+}
+
+.stat {
+    background: var(--surface);
+    border-radius: 14px;
+    padding: 13px 8px;
+    text-align: center;
+}
+
+.stat b { display: block; font-size: 1.3rem; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 0.74rem; color: var(--muted); }
+
+.tough { background: var(--surface); border-radius: var(--radius); padding: 14px 16px; }
+.tough h3 { margin: 0 0 10px; font-size: 0.95rem; color: var(--muted); font-weight: 600; }
+.tough ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.tough li {
+    padding: 7px 12px;
+    border-radius: 10px;
+    background: var(--surface-2);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.btn {
+    display: block;
+    width: 100%;
+    padding: 17px;
+    border-radius: var(--radius);
+    background: var(--surface);
+    font-size: 1.05rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+.btn.primary { background: linear-gradient(135deg, var(--accent), #5b4bd6); }
+.btn:active { transform: scale(0.985); }
+
+.stack { display: grid; gap: 10px; }
+
+/* ── Мелочи ────────────────────────────────────────────────────────────── */
+
+.tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    padding: 4px 0 8px;
+}
+
+.tools button {
+    padding: 9px 14px;
+    border-radius: 10px;
+    background: var(--surface);
+    color: var(--muted);
+    font-size: 0.83rem;
+}
+
+.note {
+    text-align: center;
+    font-size: 0.76rem;
+    color: var(--muted);
+    line-height: 1.5;
+    padding-bottom: 4px;
+}
+
+.spacer { flex: 1; }
+
+@keyframes pop { 50% { transform: scale(1.09); } }
+.pop { animation: pop 0.3s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+}

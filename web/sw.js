@@ -1,7 +1,7 @@
 /* Service worker: приложение целиком уходит в офлайн после первой загрузки.
  * VERSION подставляется скриптом scripts/stamp-version.mjs из package.json —
  * смена версии катит новый кэш и выбрасывает старый. */
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 const CACHE = `umnozhenie-${VERSION}`;
 
 /* Скомпилированные модули. Список подставляет scripts/stamp-version.mjs после
@@ -27,6 +27,8 @@ const MODULES = [
     "./js/ui/keypad.js",
     "./js/ui/sound-toggle.js",
     "./js/ui/sprint.js",
+    "./js/ui/update-banner.js",
+    "./js/update.js",
 ];
 
 /* Всё, что нужно, чтобы приложение поднялось без сети. */
@@ -39,12 +41,22 @@ const SHELL = [
     ...MODULES,
 ];
 
+/* Установка без skipWaiting(): новая версия наполняет свой кэш и ждёт.
+ *
+ * Вставать сразу нельзя — activate сносит кэш предыдущей версии, а открытая
+ * страница продолжает работать на её модулях: следующий динамический import
+ * ушёл бы в сеть, которой у офлайн-приложения может и не быть. Вместо этого
+ * приложение показывает баннер (src/update.ts), и воркер снимает ожидание по
+ * сообщению — то есть после нажатия «Обновить», перед самой перезагрузкой.
+ *
+ * Баннер можно и не трогать: воркер дождётся, когда приложение закроют, и
+ * встанет при следующем запуске — как это работало и раньше. */
 self.addEventListener("install", (event) => {
-    event.waitUntil(
-        caches.open(CACHE)
-            .then((cache) => cache.addAll(SHELL))
-            .then(() => self.skipWaiting()),
-    );
+    event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
+});
+
+self.addEventListener("message", (event) => {
+    if (event.data?.type === "skip-waiting") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {

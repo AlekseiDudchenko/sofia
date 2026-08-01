@@ -1,6 +1,9 @@
 import { test, expect, type Page } from "@playwright/test";
 import { spawn } from "node:child_process";
+import { createServer, type Server } from "node:http";
 import { connect } from "node:net";
+import { readFile } from "node:fs/promises";
+import { extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /** Ждёт, пока порт начнёт (up = true) или перестанет принимать соединения. */
@@ -250,6 +253,97 @@ test("после первой загрузки приложение работа
     } finally {
         server.kill("SIGKILL");
         await context.close();
+    }
+});
+
+/* Сообщение о новой версии.
+ *
+ * Проверить его можно только настоящим обновлением: браузер сам решает, когда
+ * считать sw.js изменившимся, и подделать это со стороны страницы нельзя.
+ * Поэтому поднимаем свой сервер поверх web/ и на лету подменяем в sw.js версию
+ * — ровно то, что делает выпуск.
+ *
+ * Общий dev-сервер для этого не годится: тесты идут параллельно, а сменившаяся
+ * версия сбросила бы кэш и остальным. */
+const MIME: Record<string, string> = {
+    ".html": "text/html; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".webmanifest": "application/manifest+json; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+};
+
+function serveWeb(port: number, version: () => string): Server {
+    const root = fileURLToPath(new URL("../web/", import.meta.url));
+
+    return createServer(async (req, res) => {
+        const path = normalize(new URL(req.url ?? "/", "http://localhost").pathname)
+            .replace(/^(\.\.[/\\])+/, "");
+        const file = join(root, path.endsWith("/") ? `${path}index.html` : path);
+
+        try {
+            const raw = await readFile(file);
+            const body = file.endsWith("sw.js")
+                ? raw.toString("utf8").replace(/const VERSION = "[^"]*";/, `const VERSION = "${version()}";`)
+                : raw;
+            res.writeHead(200, {
+                "Content-Type": MIME[extname(file)] ?? "application/octet-stream",
+                "Cache-Control": "no-store",
+            });
+            res.end(body);
+        } catch {
+            res.writeHead(404).end("not found");
+        }
+    }).listen(port);
+}
+
+test("о новой версии сообщают, а не подменяют её молча", async ({ browser }) => {
+    const port = 5197;
+    let version = "9.9.8";
+    const server = serveWeb(port, () => version);
+
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    try {
+        await waitForServer(port, true);
+        await page.goto(`http://localhost:${port}/`);
+        // Ждём не просто установки, а именно контроля над страницей: до него
+        // приложение не отличит обновление от первой установки.
+        await page.evaluate(async () => {
+            await navigator.serviceWorker.ready;
+            if (navigator.serviceWorker.controller) return;
+            await new Promise((resolve) => {
+                navigator.serviceWorker.addEventListener("controllerchange", resolve, { once: true });
+            });
+        });
+        // Первая установка обновлением не считается — сообщать не о чем.
+        await expect(page.locator(".update-bar")).toHaveCount(0);
+
+        version = "9.9.9";
+        await page.evaluate(() => navigator.serviceWorker.getRegistration().then((r) => r!.update()));
+
+        await expect(page.locator(".update-bar")).toContainText("Вышла новая версия");
+        // Новая версия ждёт разрешения: пока её не позвали, кэш прежний.
+        expect(await page.evaluate(() => caches.keys())).toContain("umnozhenie-9.9.8");
+
+        // На тренировке полоса накрыла бы клавиатуру — там её быть не должно.
+        await page.click('[data-act="drill"]');
+        await page.waitForSelector("#question");
+        await expect(page.locator(".update-bar")).toHaveCount(0);
+        await page.click('[data-act="home"]');
+        await expect(page.locator(".update-bar")).toBeVisible();
+
+        await page.click(".update-bar button");
+
+        // Страница перезагрузилась, и заново собрал её уже новый воркер.
+        await expect(page.locator('[data-act="drill"]')).toBeVisible();
+        await expect(page.locator(".update-bar")).toHaveCount(0);
+        expect(await page.evaluate(() => caches.keys())).toEqual(["umnozhenie-9.9.9"]);
+    } finally {
+        await context.close();
+        await new Promise((resolve) => server.close(resolve));
     }
 });
 

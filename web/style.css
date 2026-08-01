@@ -467,6 +467,42 @@ button {
 
 .spacer { flex: 1; }
 
+/* ── Сообщение о новой версии ──────────────────────────────────────────── */
+
+/* Полоса поверх главной, а не строка в потоке: она приходит, когда экран уже
+   собран, и вставка в поток дёргала бы вёрстку под пальцем. */
+.update-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px max(14px, env(safe-area-inset-right))
+        max(12px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+    background: var(--surface-2);
+    border-top: 1px solid var(--line);
+    font-size: 0.9rem;
+}
+
+.update-bar button {
+    padding: 9px 16px;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.update-bar button:disabled { opacity: 0.6; cursor: default; }
+
+/* Пока полоса висит, нижние кнопки главной не должны прятаться под ней. */
+body.update-open .app { padding-bottom: calc(max(12px, env(safe-area-inset-bottom)) + 60px); }
+
 /* ── Большой сенсорный экран ───────────────────────────────────────────── */
 
 /* Планшет или тот же телефон в «версии для ПК». Пример и поле ответа по меркам

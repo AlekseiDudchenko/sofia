@@ -12,8 +12,10 @@ import { dayKey } from "../scheduler.js";
 import { sprintPool, pickSprintFact } from "../session.js";
 import { loadCards, recordAnswer, bestSprint, submitSprint } from "../store.js";
 import { go } from "../router.js";
+import { play } from "../sound.js";
 import { render, qs, onAction, plural } from "./dom.js";
 import { keypadHTML, bindKeypad } from "./keypad.js";
+import { SOUND_ACTION, soundIconHTML, toggleSound } from "./sound-toggle.js";
 
 const ROUND_MS = 60_000;
 const CORRECT_PAUSE_MS = 220;
@@ -31,6 +33,8 @@ export function showSprint(): () => void {
     let score = 0;
     let attempts = 0;
     let finished = false;
+    /** Секунда, на которой уже щёлкнул отсчёт: тикер бежит каждые 100 мс. */
+    let tickedAt = 0;
 
     const startedAt = performance.now();
     const timers: number[] = [];
@@ -41,6 +45,7 @@ export function showSprint(): () => void {
             <div class="play-bar">
                 <button class="icon-btn" data-act="home" aria-label="Выйти">✕</button>
                 <div class="bar"><span id="progress" style="width:100%"></span></div>
+                ${soundIconHTML()}
                 <div class="timer" id="timer">60</div>
                 <div class="pill score-pill">⚡&nbsp;<b id="score">0</b></div>
             </div>
@@ -60,16 +65,28 @@ export function showSprint(): () => void {
     const progressEl = qs("#progress", scope);
     const scoreEl = qs("#score", scope);
 
-    onAction(scope, (action) => { if (action === "home") go("/"); });
+    onAction(scope, (action, el) => {
+        if (action === "home") go("/");
+        else if (action === SOUND_ACTION) toggleSound(el);
+    });
     const unbind = bindKeypad(scope, { onDigit, onErase });
 
     const ticker = window.setInterval(tick, 100);
 
     function tick(): void {
         const left = Math.max(0, ROUND_MS - (performance.now() - startedAt));
-        timerEl.textContent = String(Math.ceil(left / 1000));
+        const seconds = Math.ceil(left / 1000);
+        timerEl.textContent = String(seconds);
         timerEl.classList.toggle("low", left <= 10_000);
         progressEl.style.width = `${(left / ROUND_MS) * 100}%`;
+
+        // Последние три секунды отсчитываются вслух — на экран в этот момент
+        // не смотрят, смотрят на пример.
+        if (seconds > 0 && seconds <= 3 && seconds !== tickedAt) {
+            tickedAt = seconds;
+            play("tick");
+        }
+
         if (left === 0) finish();
     }
 
@@ -97,7 +114,7 @@ export function showSprint(): () => void {
         typed += digit;
 
         const verdict = checkInput(typed, current.product);
-        if (verdict === "pending") { paintSlot(""); return; }
+        if (verdict === "pending") { play("key"); paintSlot(""); return; }
 
         locked = true;
         attempts++;
@@ -106,9 +123,11 @@ export function showSprint(): () => void {
         if (verdict === "correct") {
             score++;
             scoreEl.textContent = String(score);
+            play("correct");
             paintSlot("correct");
             later(next, CORRECT_PAUSE_MS);
         } else {
+            play("wrong");
             const { left, right } = orientation(current, flip);
             paintSlot("wrong");
             hintEl.className = "hint bad";
@@ -119,6 +138,7 @@ export function showSprint(): () => void {
 
     function onErase(): void {
         if (locked || typed === "") return;
+        play("erase");
         typed = typed.slice(0, -1);
         paintSlot("");
     }
@@ -127,7 +147,12 @@ export function showSprint(): () => void {
         if (finished) return;
         finished = true;
         stop();
-        showSprintSummary(score, attempts, submitSprint(score));
+
+        const isRecord = submitSprint(score);
+        // Рекорд отменяет обычное «время вышло»: два сигнала подряд смазали бы
+        // главную новость раунда.
+        play(isRecord ? "record" : "timeup");
+        showSprintSummary(score, attempts, isRecord);
     }
 
     function stop(): void {

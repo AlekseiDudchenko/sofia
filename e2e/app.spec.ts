@@ -1,4 +1,21 @@
 import { test, expect, type Page } from "@playwright/test";
+import { spawn } from "node:child_process";
+import { connect } from "node:net";
+import { fileURLToPath } from "node:url";
+
+/** Ждёт, пока порт начнёт (up = true) или перестанет принимать соединения. */
+async function waitForServer(port: number, up: boolean): Promise<void> {
+    for (let i = 0; i < 100; i++) {
+        const listening = await new Promise<boolean>((resolve) => {
+            const socket = connect({ port, host: "127.0.0.1" });
+            socket.on("connect", () => { socket.destroy(); resolve(true); });
+            socket.on("error", () => resolve(false));
+        });
+        if (listening === up) return;
+        await new Promise((r) => setTimeout(r, 100));
+    }
+    throw new Error(`сервер на порту ${port} так и не ${up ? "поднялся" : "погас"}`);
+}
 
 /** Читает текущий пример с экрана и возвращает правильный ответ. */
 async function currentProduct(page: Page): Promise<number> {
@@ -92,12 +109,149 @@ for (const viewport of [
         expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
         expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
         // Прокрутки на экране тренировки быть не должно вовсе.
-        const overflow = await page.evaluate(
-            () => document.documentElement.scrollHeight - window.innerHeight,
-        );
-        expect(overflow).toBeLessThanOrEqual(0);
+        const overflow = await page.evaluate(() => ({
+            y: document.documentElement.scrollHeight - window.innerHeight,
+            x: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        }));
+        expect(overflow.y).toBeLessThanOrEqual(0);
+        // Верхняя панель обросла кнопкой звука — по ширине она тоже обязана влезть.
+        expect(overflow.x).toBeLessThanOrEqual(0);
     });
 }
+
+/* Звук синтезируется в Web Audio, проверить сам сигнал в браузерном тесте
+ * нельзя. Проверяем то, что ломается на практике: узлы действительно
+ * создаются, тренировка не падает без звука и выбор переживает перезагрузку. */
+test.describe("звук", () => {
+    test("по умолчанию включён, выключается и переживает перезагрузку", async ({ page }) => {
+        const toggle = page.locator('[data-act="sound"]');
+        await expect(toggle).toHaveAttribute("aria-pressed", "true");
+
+        await toggle.click();
+        await expect(toggle).toHaveAttribute("aria-pressed", "false");
+        await expect(toggle.locator(".sound-ic")).toHaveText("🔇");
+
+        await page.reload();
+        await expect(page.locator('[data-act="sound"]')).toHaveAttribute("aria-pressed", "false");
+    });
+
+    test("ответ в тренировке запускает осциллятор", async ({ page }) => {
+        await page.addInitScript(() => {
+            const started: number[] = [];
+            (window as unknown as { __osc: number[] }).__osc = started;
+            const create = AudioContext.prototype.createOscillator;
+            AudioContext.prototype.createOscillator = function patched(this: AudioContext) {
+                started.push(Date.now());
+                return create.call(this);
+            };
+        });
+        await page.goto("/");
+
+        await page.click('[data-act="drill"]');
+        await type(page, await currentProduct(page));
+        await expect(page.locator(".slot")).toHaveClass(/correct/);
+
+        const count = await page.evaluate(() => (window as unknown as { __osc: number[] }).__osc.length);
+        expect(count).toBeGreaterThan(0);
+    });
+
+    test("выключение прямо на тренировке не сбрасывает текущий пример", async ({ page }) => {
+        await page.click('[data-act="drill"]');
+        await page.waitForSelector("#question");
+        const before = await page.locator("#question").textContent();
+
+        await page.click('[data-act="sound"]');
+
+        await expect(page.locator('[data-act="sound"]')).toHaveAttribute("aria-pressed", "false");
+        await expect(page.locator("#question")).toHaveText(before!);
+        // Ответ по-прежнему принимается — панель не перехватила клавиатуру.
+        await type(page, await currentProduct(page));
+        await expect(page.locator(".slot")).toHaveClass(/correct/);
+    });
+
+    test("с выключенным звуком тренировка работает и осцилляторов нет", async ({ page }) => {
+        await page.click('[data-act="sound"]');
+        await page.addInitScript(() => {
+            const started: number[] = [];
+            (window as unknown as { __osc: number[] }).__osc = started;
+            const create = AudioContext.prototype.createOscillator;
+            AudioContext.prototype.createOscillator = function patched(this: AudioContext) {
+                started.push(Date.now());
+                return create.call(this);
+            };
+        });
+        await page.goto("/");
+
+        await page.click('[data-act="drill"]');
+        await type(page, await currentProduct(page));
+        await expect(page.locator(".slot")).toHaveClass(/correct/);
+
+        const count = await page.evaluate(() => (window as unknown as { __osc: number[] }).__osc.length);
+        expect(count).toBe(0);
+    });
+});
+
+
+/* Контейнер #app один на все экраны, и обработчики кликов копились на нём от
+ * экрана к экрану. Пока имена действий у экранов не пересекались, это было
+ * незаметно; одно и то же «sound» в настройках и в панели тренировки стало
+ * срабатывать дважды за клик — то есть не срабатывать вовсе. */
+test("действие с общим именем не срабатывает дважды после смены экрана", async ({ page }) => {
+    await page.click('[data-act="drill"]');
+    await page.waitForSelector("#question");
+
+    await page.click('[data-act="sound"]');
+    await expect(page.locator('[data-act="sound"]')).toHaveAttribute("aria-pressed", "false");
+    expect(await page.evaluate(() => localStorage.getItem("sofia.sound.v1"))).toBe('{"on":false}');
+});
+
+/* Обещание «интернет нужен один раз» — не лозунг с главной, а поведение.
+ *
+ * Первая загрузка идёт мимо сервис-воркера: он в этот момент только ставится
+ * и наполняет кэш списком SHELL. Значит, офлайн после неё поднимется ровно
+ * настолько, насколько SHELL полон. Пока в нём лежал один main.js, тренировка
+ * без сети упиралась в белый экран: import router.js уходил в мёртвую сеть.
+ *
+ * Сеть рвём по-настоящему, гася сервер. context.setOffline() здесь бесполезен:
+ * он глушит запросы страницы, но не запросы сервис-воркера — тот продолжает
+ * ходить в сеть, и тест проходит независимо от содержимого кэша. */
+test("после первой загрузки приложение работает без сети", async ({ browser }) => {
+    const port = 5199;
+    const server = spawn("node", ["scripts/dev-server.mjs"], {
+        cwd: fileURLToPath(new URL("..", import.meta.url)),
+        env: { ...process.env, PORT: String(port) },
+        stdio: "ignore",
+    });
+
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    try {
+        await waitForServer(port, true);
+        await page.goto(`http://localhost:${port}/`);
+        // Воркер встал и разложил SHELL по кэшу.
+        await page.evaluate(() => navigator.serviceWorker.ready);
+        await expect(page.locator('[data-act="drill"]')).toBeVisible();
+
+        server.kill("SIGKILL");
+        await waitForServer(port, false);
+
+        await page.reload();
+        // Главная собирается модулями из web/js — если хоть одного нет в кэше,
+        // приложение не отрисуется вовсе.
+        await expect(page.locator('[data-act="drill"]')).toBeVisible();
+        await expect(page.locator(".grid .cell")).toHaveCount(81);
+
+        // И тренировка тоже: её экран тянет ещё несколько модулей.
+        await page.click('[data-act="drill"]');
+        await page.waitForSelector("#question");
+        await type(page, await currentProduct(page));
+        await expect(page.locator(".slot")).toHaveClass(/correct/);
+    } finally {
+        server.kill("SIGKILL");
+        await context.close();
+    }
+});
 
 test("спринт считает очки и идёт по таймеру", async ({ page }) => {
     await page.click('[data-act="sprint"]');

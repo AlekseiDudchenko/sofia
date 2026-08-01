@@ -10,6 +10,7 @@ import { newCard, type CardState } from "./scheduler.js";
 const CARDS_KEY = "sofia.cards.v1";
 const DAYS_KEY = "sofia.days.v1";
 const SPRINT_KEY = "sofia.sprint.v1";
+const SOUND_KEY = "sofia.sound.v1";
 
 /** Ответов в день, чтобы день засчитался в серию. */
 export const DAILY_GOAL = 30;
@@ -115,6 +116,22 @@ export function submitSprint(score: number): boolean {
     if (score <= bestSprint()) return false;
     write(SPRINT_KEY, { best: score });
     return true;
+}
+
+// ── Звук ──────────────────────────────────────────────────────────────────
+
+/** Звук — настройка устройства, а не прогресс.
+ *
+ * Поэтому он живёт отдельным ключом: в резервную копию не попадает и
+ * «Начать заново» его не трогает. Копию переносят на другой телефон, где
+ * своя обстановка — навязывать ей звук из старого было бы неправильно, а
+ * стирать выключенный звук вместе с прогрессом — тем более. */
+export function soundEnabled(): boolean {
+    return read<{ on: boolean }>(SOUND_KEY, { on: true }).on !== false;
+}
+
+export function setSoundEnabled(on: boolean): void {
+    write(SOUND_KEY, { on });
 }
 
 // ── Резервная копия ───────────────────────────────────────────────────────

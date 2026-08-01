@@ -7,8 +7,10 @@ import { applyOutcome, dayKey } from "../scheduler.js";
 import { buildDrillQueue, requeue } from "../session.js";
 import { loadCards, saveCards, getOrCreate, recordAnswer } from "../store.js";
 import { go } from "../router.js";
+import { play } from "../sound.js";
 import { render, qs, onAction, formatSeconds, plural } from "./dom.js";
 import { keypadHTML, bindKeypad } from "./keypad.js";
+import { SOUND_ACTION, soundIconHTML, toggleSound } from "./sound-toggle.js";
 
 const CORRECT_PAUSE_MS = 450;
 /** После ошибки пауза длиннее: нужно время прочитать правильный ответ. */
@@ -42,6 +44,7 @@ export function showDrill(): () => void {
             <div class="play-bar">
                 <button class="icon-btn" data-act="home" aria-label="На главную">✕</button>
                 <div class="bar"><span id="progress" style="width:0%"></span></div>
+                ${soundIconHTML()}
                 <div class="score" id="left"></div>
             </div>
             <div class="stage">
@@ -59,7 +62,10 @@ export function showDrill(): () => void {
     const progressEl = qs("#progress", scope);
     const leftEl = qs("#left", scope);
 
-    onAction(scope, (action) => { if (action === "home") go("/"); });
+    onAction(scope, (action, el) => {
+        if (action === "home") go("/");
+        else if (action === SOUND_ACTION) toggleSound(el);
+    });
     const unbind = bindKeypad(scope, { onDigit, onErase });
 
     function paintSlot(state: "" | "correct" | "wrong"): void {
@@ -93,16 +99,21 @@ export function showDrill(): () => void {
 
     function onDigit(digit: string): void {
         if (locked || !current) return;
+        // Отметка времени снимается до звука: планирование сигнала занимает
+        // доли миллисекунды, но замер припоминания не должно трогать ничто.
         if (typed === "") firstKeyAt = performance.now();
         typed += digit;
 
         const verdict = checkInput(typed, current.product);
-        if (verdict === "pending") { paintSlot(""); return; }
+        // Щелчок звучит только у цифры, которая ничего не решила: на последней
+        // сразу идёт вердикт, и складывать их в один момент незачем.
+        if (verdict === "pending") { play("key"); paintSlot(""); return; }
         resolve(verdict === "correct");
     }
 
     function onErase(): void {
         if (locked || typed === "") return;
+        play("erase");
         typed = typed.slice(0, -1);
         paintSlot("");
     }
@@ -122,12 +133,14 @@ export function showDrill(): () => void {
         if (isCorrect) {
             correct++;
             if (result.timingTrusted) latencies.push(latency);
+            play(result.speed === "fast" ? "fast" : "correct");
             paintSlot("correct");
             slotEl.classList.add("pop");
             hintEl.textContent = result.speed === "fast" ? "Быстро!" : "";
             later(next, CORRECT_PAUSE_MS);
         } else {
             missed.add(current.id);
+            play("wrong");
             const { left, right } = orientation(current, flip);
             paintSlot("wrong");
             hintEl.className = "hint bad";
@@ -139,6 +152,7 @@ export function showDrill(): () => void {
 
     function finish(): void {
         unbind();
+        play("finish");
         showDrillSummary({ answered, correct, latencies, missed: [...missed] });
     }
 

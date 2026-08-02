@@ -21,6 +21,7 @@ const MODULES = [
     "./js/session.js",
     "./js/sound.js",
     "./js/store.js",
+    "./js/ui/array.js",
     "./js/ui/dom.js",
     "./js/ui/drill.js",
     "./js/ui/home.js",

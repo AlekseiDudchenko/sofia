@@ -9,7 +9,8 @@ import { loadCards, saveCards, getOrCreate, recordAnswer } from "../store.js";
 import { go } from "../router.js";
 import { play } from "../sound.js";
 import { render, qs, onAction, formatSeconds, plural } from "./dom.js";
-import { minionHTML, setMinionMood, randomEyes } from "./minion.js";
+import { minionHTML, setMinionMood, randomEyes, type MinionMood } from "./minion.js";
+import { hasArray, arrayShape, arrayHTML, setArrayMood } from "./array.js";
 import { keypadHTML, bindKeypad } from "./keypad.js";
 import { SOUND_ACTION, soundIconHTML, toggleSound } from "./sound-toggle.js";
 
@@ -31,6 +32,8 @@ export function showDrill(): () => void {
     let shownAt = 0;
     let firstKeyAt = 0;
     let locked = true;
+    /** Открыта ли подсказка на текущем примере — от этого зависит оценка. */
+    let hinted = false;
 
     let answered = 0;
     let correct = 0;
@@ -51,15 +54,20 @@ export function showDrill(): () => void {
             <div class="stage">
                 ${minionHTML({ eyes: randomEyes(), size: "md" })}
                 <div class="question" id="question"></div>
+                <div class="array" id="array"></div>
                 <div class="slot" id="slot"></div>
                 <div class="hint" id="hint"></div>
+                <button class="hint-btn" id="hint-btn" data-act="hint" hidden>Подсказка</button>
             </div>
             ${keypadHTML()}
         </div>
     `);
 
+    const stageEl = qs(".stage", scope);
     const minionEl = qs(".minion", scope);
     const questionEl = qs("#question", scope);
+    const arrayEl = qs("#array", scope);
+    const hintBtn = qs("#hint-btn", scope);
     const slotEl = qs("#slot", scope);
     const hintEl = qs("#hint", scope);
     const progressEl = qs("#progress", scope);
@@ -67,6 +75,7 @@ export function showDrill(): () => void {
 
     onAction(scope, (action, el) => {
         if (action === "home") go("/");
+        else if (action === "hint") showArray();
         else if (action === SOUND_ACTION) toggleSound(el);
     });
     const unbind = bindKeypad(scope, { onDigit, onErase });
@@ -93,6 +102,14 @@ export function showDrill(): () => void {
         paintSlot("");
         setMinionMood(minionEl, "idle");
 
+        // Подсказку каждый пример просят заново: она помогает, пока факт
+        // новый, и мешает, как только он начал вспоминаться сам.
+        hinted = false;
+        arrayEl.innerHTML = "";
+        stageEl.classList.remove("with-array");
+        minionEl.hidden = false;
+        hintBtn.hidden = !hasArray(left, right);
+
         const total = answered + remaining.length + 1;
         progressEl.style.width = `${Math.round((answered / total) * 100)}%`;
         leftEl.textContent = String(remaining.length + 1);
@@ -115,6 +132,32 @@ export function showDrill(): () => void {
         resolve(verdict === "correct");
     }
 
+    /** Подсказка: маскот уступает место строю миньонов. Вдвоём им тесно —
+     *  строй занимает ровно то место, где стоял миньон-маскот. */
+    function showArray(): void {
+        if (locked || hinted || !current) return;
+        const { left, right } = orientation(current, flip);
+
+        const { rows, cols } = arrayShape(left, right);
+
+        hinted = true;
+        arrayEl.innerHTML = arrayHTML(rows, cols);
+        // Число рядов уходит в CSS: от него зависит, сколько высоты строй
+        // вправе занять, — два ряда не должны раздуваться на весь экран.
+        arrayEl.style.setProperty("--rows", String(rows));
+        // Классом экран отдаёт строю ещё немного высоты: пример и поле ответа
+        // ужимаются, потому что считать по картинке сейчас важнее.
+        stageEl.classList.add("with-array");
+        minionEl.hidden = true;
+        hintBtn.hidden = true;
+    }
+
+    /** Реакция на ответ: маскот, а при открытой подсказке — весь строй. */
+    function react(mood: MinionMood): void {
+        setMinionMood(minionEl, mood);
+        if (hinted) setArrayMood(arrayEl, mood);
+    }
+
     function onErase(): void {
         if (locked || typed === "") return;
         play("erase");
@@ -125,9 +168,18 @@ export function showDrill(): () => void {
     function resolve(isCorrect: boolean): void {
         if (!current) return;
         locked = true;
+        hintBtn.hidden = true;
 
         const latency = Math.max(0, firstKeyAt - shownAt);
-        const result = grade(isCorrect, latency);
+        const graded = grade(isCorrect, latency);
+        // Со строем на экране ответ можно пересчитать, а не вспомнить, поэтому
+        // ступень он не двигает ни вверх, ни вниз — ровно как ответ после
+        // долгой паузы. Наказывать за просьбу о помощи нельзя: иначе кнопка
+        // подсказки становится ловушкой и её перестают нажимать. Ошибка при
+        // этом остаётся ошибкой и сбрасывает факт, как обычно.
+        const result = hinted && isCorrect
+            ? { ...graded, speed: "ok" as const, timingTrusted: false }
+            : graded;
         const card = getOrCreate(cards, current.id, today);
         cards.set(current.id, applyOutcome(card, { ...result, latencyMs: latency }, today));
         saveCards(cards);
@@ -141,7 +193,7 @@ export function showDrill(): () => void {
             paintSlot("correct");
             // Быстрый ответ миньон празднует прыжком, обычный — просто улыбкой:
             // иначе разницы между «вспомнила» и «досчитала» не видно.
-            setMinionMood(minionEl, result.speed === "fast" ? "cheer" : "happy");
+            react(result.speed === "fast" ? "cheer" : "happy");
             slotEl.classList.add("pop");
             hintEl.textContent = result.speed === "fast" ? "Быстро!" : "";
             later(next, CORRECT_PAUSE_MS);
@@ -150,7 +202,7 @@ export function showDrill(): () => void {
             play("wrong");
             const { left, right } = orientation(current, flip);
             paintSlot("wrong");
-            setMinionMood(minionEl, "oops");
+            react("oops");
             hintEl.className = "hint bad";
             hintEl.textContent = `${left} × ${right} = ${current.product}`;
             remaining = requeue(remaining, current);

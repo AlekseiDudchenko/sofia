@@ -5,6 +5,7 @@ import { newCard } from "../web/js/scheduler.js";
 import {
     buildDrillQueue, introducedToday, masteredCount,
     sprintPool, sprintWeight, pickSprintFact, requeue,
+    tickRetries, MARATHON_LIVES, MARATHON_RETRY_GAP,
 } from "../web/js/session.js";
 
 const TODAY = "2026-08-01";
@@ -95,6 +96,44 @@ test("выбор укладывается в пул при любом значе
         const picked = pickSprintFact(pool, cards, () => r);
         assert.ok(pool.includes(picked), `выбор вне пула при rng=${r}`);
     }
+});
+
+// ── Марафон ───────────────────────────────────────────────────────────────
+
+test("в марафоне три жизни, а переспрос ближе, чем в тренировке", () => {
+    assert.equal(MARATHON_LIVES, 3);
+    assert.ok(MARATHON_RETRY_GAP < 4);
+});
+
+test("ошибочный факт возвращается ровно через заданное число примеров", () => {
+    let retries = [{ fact: DECK[0], after: 3 }];
+    for (let i = 0; i < 2; i++) {
+        const step = tickRetries(retries);
+        assert.equal(step.due, null, `факт вернулся раньше срока: шаг ${i + 1}`);
+        retries = step.rest;
+    }
+    assert.equal(tickRetries(retries).due, DECK[0]);
+});
+
+test("за один пример возвращается только один факт", () => {
+    const step = tickRetries([
+        { fact: DECK[0], after: 1 },
+        { fact: DECK[1], after: 1 },
+    ]);
+    assert.equal(step.due, DECK[0]);
+    assert.deepEqual(step.rest.map((r) => r.fact.id), [DECK[1].id]);
+    // Второй не потерялся и придёт следующим.
+    assert.equal(tickRetries(step.rest).due, DECK[1]);
+});
+
+test("пустая очередь переспросов ничего не выдаёт", () => {
+    assert.deepEqual(tickRetries([]), { due: null, rest: [] });
+});
+
+test("tickRetries не мутирует исходную очередь", () => {
+    const retries = [{ fact: DECK[0], after: 2 }];
+    tickRetries(retries);
+    assert.equal(retries[0].after, 2);
 });
 
 // ── Переспрос внутри сессии ───────────────────────────────────────────────

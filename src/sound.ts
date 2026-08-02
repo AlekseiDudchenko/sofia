@@ -22,7 +22,8 @@ export type Cue =
     | "finish"   // тренировка закончена
     | "record"   // новый рекорд спринта
     | "tick"     // последние секунды спринта
-    | "timeup";  // минута вышла
+    | "timeup"   // минута вышла
+    | "gameover";// в марафоне кончились жизни
 
 interface Note {
     /** Частота, Гц. */
@@ -78,6 +79,13 @@ const CUES: Record<Cue, readonly Note[]> = {
         { freq: 1975, at: 255, dur: 420, gain: 0.12 },
     ],
     tick: [{ freq: 880, dur: 40, type: "triangle", gain: 0.2 }],
+    // Жизни кончились — три ступени вниз. Не резче ошибки: игра закончилась,
+    // а не случилось несчастье.
+    gameover: [
+        { freq: 587, dur: 130, type: "triangle", gain: 0.3 },
+        { freq: 466, at: 125, dur: 130, type: "triangle", gain: 0.3 },
+        { freq: 349, at: 250, dur: 420, type: "triangle", gain: 0.32 },
+    ],
     timeup: [
         { freq: 660, dur: 140, gain: 0.3 },
         { freq: 440, at: 130, dur: 320, gain: 0.3 },

@@ -3,6 +3,7 @@ import { primeSound } from "./sound.js";
 import { showHome } from "./ui/home.js";
 import { showDrill } from "./ui/drill.js";
 import { showSprint } from "./ui/sprint.js";
+import { showMarathon } from "./ui/marathon.js";
 
 /** Уборка за предыдущим экраном: снятие слушателя клавиатуры и таймеров.
  *  Без неё слушатель тренировки продолжил бы ловить нажатия на главной. */
@@ -18,6 +19,9 @@ function route(path: string): void {
     } else if (path === "/sprint") {
         document.title = "Спринт";
         cleanup = showSprint();
+    } else if (path === "/marathon") {
+        document.title = "Марафон";
+        cleanup = showMarathon();
     } else {
         document.title = "Таблица умножения миньонов для Сони из Томска";
         cleanup = showHome();

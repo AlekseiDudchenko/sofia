@@ -32,9 +32,10 @@ test.beforeEach(async ({ page }) => {
     await page.goto("/");
 });
 
-test("на главной видны обе тренировки и пустая карта", async ({ page }) => {
+test("на главной видны все три режима и пустая карта", async ({ page }) => {
     await expect(page.locator('[data-act="drill"]')).toContainText("Тренировка");
     await expect(page.locator('[data-act="sprint"]')).toContainText("Спринт");
+    await expect(page.locator('[data-act="marathon"]')).toContainText("Марафон");
     await expect(page.locator(".map-head span")).toHaveText("0 из 36 на автомате");
     // Ровно 81 клетка: 8×8 фактов плюс заголовки строк и столбцов.
     await expect(page.locator(".grid .cell")).toHaveCount(81);
@@ -259,6 +260,40 @@ test("спринт считает очки и идёт по таймеру", asy
 
     await type(page, await currentProduct(page));
     await expect(page.locator("#score")).toHaveText("1");
+});
+
+/* Марафон: без таймера, но с тремя жизнями. Проверяем то, ради чего он и
+ * сделан, — что ошибка стоит сердечка, а третья заканчивает игру. */
+test("марафон отнимает жизнь за ошибку и кончается на третьей", async ({ page }) => {
+    /** Цифра, которая для этого ответа заведомо неверна и не является началом. */
+    const wrongFor = (product: number) => (String(product)[0] === "9" ? "1" : "9");
+
+    await page.click('[data-act="marathon"]');
+    await expect(page.locator(".heart")).toHaveCount(3);
+    await expect(page.locator(".heart.lost")).toHaveCount(0);
+
+    // Верный ответ поднимает счёт и жизней не трогает.
+    await type(page, await currentProduct(page));
+    await expect(page.locator("#score")).toHaveText("1");
+    await expect(page.locator(".heart.lost")).toHaveCount(0);
+    await page.waitForTimeout(500);
+
+    for (let life = 1; life <= 3; life++) {
+        await type(page, wrongFor(await currentProduct(page)));
+        if (life === 3) break;
+        await expect(page.locator(".heart.lost")).toHaveCount(life);
+        await page.waitForTimeout(1900);
+    }
+
+    // Третья ошибка выносит на итоги, и там ровно один правильный ответ.
+    await expect(page.locator(".result .big")).toHaveText("1");
+    await expect(page.locator(".tough li")).toHaveCount(3);
+});
+
+test("рекорд марафона переживает выход на главную", async ({ page }) => {
+    await page.evaluate(() => localStorage.setItem("sofia.marathon.v1", '{"best":7}'));
+    await page.reload();
+    await expect(page.locator('[data-act="marathon"] .pill')).toHaveText("7");
 });
 
 /* Подсказка миньонами: пример 2 × 4 раскладывается в два ряда по четыре.

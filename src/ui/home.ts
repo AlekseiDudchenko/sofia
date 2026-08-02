@@ -4,7 +4,7 @@ import { DECK, MIN_FACTOR, MAX_FACTOR, factFor } from "../facts.js";
 import { dayKey, MASTERED_BOX, type CardState } from "../scheduler.js";
 import { buildDrillQueue, masteredCount } from "../session.js";
 import {
-    loadCards, todayStats, streakDays, bestSprint,
+    loadCards, todayStats, streakDays, bestSprint, bestMarathon,
     exportAll, importAll, resetAll, DAILY_GOAL,
 } from "../store.js";
 import { go } from "../router.js";
@@ -24,6 +24,7 @@ export function showHome(): () => void {
     const stats = todayStats(today);
     const streak = streakDays(today);
     const best = bestSprint();
+    const bestRun = bestMarathon();
 
     const goalPct = Math.min(100, Math.round((stats.answers / DAILY_GOAL) * 100));
     const goalDone = stats.answers >= DAILY_GOAL;
@@ -71,6 +72,14 @@ export function showHome(): () => void {
                 </span>
                 ${best ? `<span class="pill">${best}</span>` : ""}
             </button>
+            <button class="action" data-act="marathon">
+                <span class="action-emoji">❤️</span>
+                <span class="action-text">
+                    <span class="action-title">Марафон</span>
+                    <span class="action-sub">Три жизни, пока не ошибёшься</span>
+                </span>
+                ${bestRun ? `<span class="pill">${bestRun}</span>` : ""}
+            </button>
         </div>
 
         ${crewHTML(mastered)}
@@ -107,6 +116,7 @@ export function showHome(): () => void {
     onAction(scope, (action, el) => {
         if (action === "drill") go("/drill");
         else if (action === "sprint") go("/sprint");
+        else if (action === "marathon") go("/marathon");
         else if (action === "export") downloadBackup(today);
         else if (action === "import") pickBackup();
         else if (action === "reset") confirmReset();

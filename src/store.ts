@@ -10,6 +10,7 @@ import { newCard, type CardState } from "./scheduler.js";
 const CARDS_KEY = "sofia.cards.v1";
 const DAYS_KEY = "sofia.days.v1";
 const SPRINT_KEY = "sofia.sprint.v1";
+const MARATHON_KEY = "sofia.marathon.v1";
 const SOUND_KEY = "sofia.sound.v1";
 
 /** Ответов в день, чтобы день засчитался в серию. */
@@ -118,6 +119,18 @@ export function submitSprint(score: number): boolean {
     return true;
 }
 
+// ── Рекорд марафона ───────────────────────────────────────────────────────
+
+export function bestMarathon(): number {
+    return read<{ best: number }>(MARATHON_KEY, { best: 0 }).best;
+}
+
+export function submitMarathon(score: number): boolean {
+    if (score <= bestMarathon()) return false;
+    write(MARATHON_KEY, { best: score });
+    return true;
+}
+
 // ── Звук ──────────────────────────────────────────────────────────────────
 
 /** Звук — настройка устройства, а не прогресс.
@@ -143,6 +156,7 @@ export interface Backup {
     cards: CardState[];
     days: DayMap;
     sprint: { best: number };
+    marathon: { best: number };
 }
 
 export function exportAll(): Backup {
@@ -153,6 +167,7 @@ export function exportAll(): Backup {
         cards: Array.from(loadCards().values()),
         days: loadDays(),
         sprint: { best: bestSprint() },
+        marathon: { best: bestMarathon() },
     };
 }
 
@@ -162,11 +177,14 @@ export function importAll(raw: unknown): boolean {
     write(CARDS_KEY, data.cards);
     write(DAYS_KEY, data.days ?? {});
     write(SPRINT_KEY, data.sprint ?? { best: 0 });
+    // Копия, снятая до появления марафона, поля не содержит: рекорд обнуляется
+    // вместе с остальным прогрессом — копия заменяет состояние целиком.
+    write(MARATHON_KEY, data.marathon ?? { best: 0 });
     return true;
 }
 
 export function resetAll(): void {
-    for (const key of [CARDS_KEY, DAYS_KEY, SPRINT_KEY]) {
+    for (const key of [CARDS_KEY, DAYS_KEY, SPRINT_KEY, MARATHON_KEY]) {
         try { localStorage.removeItem(key); } catch { /* см. write() */ }
     }
 }
